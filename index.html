@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灰烬双星计划 · 轨道探测炮模拟</title>
+<style>
+  :root{
+    --orange:#ffa54d;
+    --orange-dim:#c77b35;
+    --teal:#8ef0d0;
+    --ash:#b08a8a;
+    --ink:#e8ded0;
+    --dim:#9a8f80;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;
+    background:#04060d radial-gradient(ellipse at center,#0a0c18 0%,#04060d 70%);
+    font-family:"Noto Serif SC","Source Han Serif SC",Georgia,serif;color:var(--ink);}
+  canvas{position:absolute;inset:0;display:block}
+  #glc{z-index:0;cursor:grab;touch-action:none}
+  #glc.grabbing{cursor:grabbing}
+  #ov{z-index:2;pointer-events:none}
+
+  .ui{position:absolute;z-index:10;user-select:none}
+
+  #header{top:0;left:0;right:0;display:flex;justify-content:space-between;
+    align-items:flex-start;padding:22px 28px;pointer-events:none;
+    flex-wrap:wrap;gap:16px;}
+  #titleblock h1{font-size:19px;font-weight:600;letter-spacing:6px;color:var(--orange)}
+  #titleblock .sub{margin-top:6px;font-size:11px;letter-spacing:3px;color:var(--dim);
+    font-family:Consolas,monospace}
+  #titleblock .rule{margin-top:10px;width:220px;height:1px;
+    background:linear-gradient(90deg,var(--orange-dim),transparent)}
+
+  #stats{display:flex;gap:22px;text-align:right}
+  .stat .label{font-size:10px;letter-spacing:3px;color:var(--dim);margin-bottom:5px;
+    white-space:nowrap}
+  .stat .value{font-size:18px;font-family:Consolas,monospace;color:var(--ink);
+    white-space:nowrap}
+  .stat .value.hot{color:var(--orange)}
+
+  #statusline{left:0;right:0;bottom:86px;text-align:center;pointer-events:none;
+    font-size:13px;letter-spacing:4px;color:var(--orange);
+    text-shadow:0 0 18px rgba(255,150,60,.45)}
+  #loopclock{left:0;right:0;bottom:56px;text-align:center;pointer-events:none;
+    font-family:Consolas,monospace;font-size:14px;letter-spacing:5px;color:var(--dim)}
+  #telemetry{left:0;right:0;bottom:116px;text-align:center;pointer-events:none;
+    font-family:Consolas,monospace;font-size:11.5px;letter-spacing:2px;
+    color:rgba(255,206,158,.75)}
+  #quote{left:0;right:0;bottom:20px;text-align:center;pointer-events:none;
+    font-size:11px;letter-spacing:2px;color:#5c554b;font-style:italic}
+  #hint{top:96px;left:28px;pointer-events:none;font-size:10px;letter-spacing:2px;
+    color:#6b635a;font-family:Consolas,monospace;line-height:2}
+
+  #controls{top:130px;right:28px;display:flex;flex-direction:column;gap:8px;
+    align-items:flex-end}
+  #controls button{
+    pointer-events:auto;cursor:pointer;background:rgba(20,16,10,.55);
+    border:1px solid rgba(255,165,77,.35);color:var(--orange);
+    font-family:inherit;font-size:12px;letter-spacing:3px;padding:8px 16px;
+    transition:all .2s;backdrop-filter:blur(3px)}
+  #controls button:hover{background:rgba(255,165,77,.15);border-color:var(--orange)}
+
+  /* 功率滑钮 */
+  #powerbox{left:28px;bottom:112px;pointer-events:auto;
+    background:rgba(8,10,16,.5);border:1px solid rgba(255,165,77,.18);
+    padding:14px 18px 12px;backdrop-filter:blur(3px)}
+  #powerbox .plabel{font-size:10px;letter-spacing:3px;color:var(--dim);margin-bottom:12px}
+  #powerSlider{-webkit-appearance:none;appearance:none;display:block;width:250px;height:4px;
+    background:linear-gradient(90deg,#5c452b,var(--orange-dim) 27%,var(--orange));
+    outline:none;cursor:pointer}
+  #powerSlider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:15px;height:15px;border-radius:50%;background:#ffd9a0;
+    border:1px solid var(--orange);box-shadow:0 0 12px rgba(255,165,77,.9);cursor:pointer}
+  #powerSlider::-moz-range-thumb{width:15px;height:15px;border-radius:50%;
+    background:#ffd9a0;border:1px solid var(--orange);
+    box-shadow:0 0 12px rgba(255,165,77,.9);cursor:pointer}
+  #ticks{position:relative;width:250px;height:16px;margin-top:6px;
+    font-size:9px;letter-spacing:1px;color:#6b635a;font-family:Consolas,monospace}
+  #ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+  #powerReadout{margin-top:8px;font-family:Consolas,monospace;font-size:13px;
+    color:var(--orange);letter-spacing:1px}
+  #presets{margin-top:10px;display:flex;gap:8px}
+  #presets button{cursor:pointer;background:none;
+    border:1px solid rgba(255,165,77,.3);color:var(--dim);font-family:inherit;
+    font-size:10px;letter-spacing:2px;padding:5px 10px;transition:all .2s}
+  #presets button:hover{border-color:var(--orange);color:var(--orange)}
+
+  /* 结果面板 */
+  #panel{left:50%;top:50%;transform:translate(-50%,-46%);width:min(480px,88vw);
+    max-height:86vh;overflow-y:auto;
+    background:rgba(8,10,16,.84);border:1px solid rgba(142,240,208,.35);
+    padding:34px 40px 30px;text-align:center;opacity:0;pointer-events:none;
+    transition:opacity 1.4s ease, transform 1.4s ease;backdrop-filter:blur(6px);
+    box-shadow:0 0 60px rgba(142,240,208,.12), inset 0 0 40px rgba(142,240,208,.04)}
+  #panel.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #panel.lost{border-color:rgba(176,138,138,.4);
+    box-shadow:0 0 60px rgba(176,138,138,.10), inset 0 0 40px rgba(176,138,138,.04)}
+  #panelClose{position:absolute;top:10px;right:12px;background:none;border:none;
+    color:var(--dim);font-size:14px;cursor:pointer;font-family:inherit;
+    letter-spacing:2px;padding:4px}
+  #panelClose:hover{color:var(--teal)}
+  #panelShow{position:absolute;z-index:10;left:50%;transform:translateX(-50%);
+    bottom:118px;display:none;cursor:pointer;background:rgba(8,10,16,.7);
+    border:1px solid rgba(142,240,208,.35);color:var(--teal);font-family:inherit;
+    font-size:12px;letter-spacing:3px;padding:8px 18px}
+  #panelShow:hover{background:rgba(142,240,208,.12)}
+  #btnStart{position:absolute;z-index:10;left:50%;transform:translateX(-50%);
+    bottom:150px;display:none;cursor:pointer;background:rgba(20,16,10,.6);
+    border:1px solid rgba(255,165,77,.6);color:var(--orange);font-family:inherit;
+    font-size:15px;letter-spacing:6px;padding:13px 38px;transition:all .25s;
+    backdrop-filter:blur(3px);box-shadow:0 0 24px rgba(255,165,77,.18)}
+  #btnStart:hover{background:rgba(255,165,77,.16);
+    box-shadow:0 0 34px rgba(255,165,77,.4)}
+  #panel .eyebrow{font-size:10px;letter-spacing:6px;color:var(--teal);margin-bottom:14px}
+  #panel .eyebrow.ash{color:var(--ash)}
+  #panel h2{font-size:24px;font-weight:600;letter-spacing:7px;color:#eafff6;
+    text-shadow:0 0 24px rgba(142,240,208,.6);margin-bottom:22px}
+  #panel h2.ash{color:#e8d5cd;text-shadow:0 0 24px rgba(176,138,138,.5)}
+  #panel .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:8px 0;border-top:1px solid rgba(232,222,208,.09);font-size:13px}
+  #panel .row .k{color:var(--dim);letter-spacing:2px;text-align:left}
+  #panel .row .v{font-family:Consolas,monospace;font-size:15px;color:var(--ink);
+    white-space:nowrap}
+  #panel .row .v.gold{color:var(--orange);font-size:16px;
+    text-shadow:0 0 14px rgba(255,165,77,.5)}
+  #panel .note{margin-top:18px;font-size:11px;color:#6b635a;letter-spacing:1px;
+    line-height:1.8;font-style:italic}
+  #coordBlock{margin-top:16px;padding-top:14px;
+    border-top:1px solid rgba(142,240,208,.15)}
+  .coordTitle{font-size:10px;letter-spacing:4px;color:var(--teal);
+    margin-bottom:10px;opacity:.85}
+  #glyphs{display:flex;justify-content:center;gap:20px}
+  .coordCap{margin-top:8px;font-size:9.5px;color:#6b635a;letter-spacing:1px;
+    line-height:1.7}
+  #panel button.act{margin-top:20px;cursor:pointer;background:none;
+    border:1px solid rgba(255,165,77,.5);color:var(--orange);font-family:inherit;
+    font-size:13px;letter-spacing:4px;padding:10px 26px;transition:all .25s}
+  #panel button.act:hover{background:rgba(255,165,77,.14);
+    box-shadow:0 0 20px rgba(255,165,77,.25)}
+
+  /* 分析面板 */
+  #analysis{position:absolute;z-index:20;inset:0;display:none;
+    background:rgba(2,4,8,.72);backdrop-filter:blur(4px)}
+  #analysis.show{display:flex;align-items:center;justify-content:center}
+  #analysisBox{width:min(680px,94vw);max-height:92vh;overflow-y:auto;
+    background:rgba(8,10,16,.94);border:1px solid rgba(255,165,77,.35);
+    padding:30px 36px 26px;position:relative}
+  #analysisBox h3{font-size:16px;letter-spacing:5px;color:var(--orange);
+    margin-bottom:6px}
+  #analysisBox .asub{font-size:10px;letter-spacing:2px;color:var(--dim);
+    font-family:Consolas,monospace;margin-bottom:16px}
+  #analysisBox .model{font-size:11.5px;color:var(--dim);line-height:1.9;
+    letter-spacing:1px;margin-bottom:14px}
+  #analysisBox .model b{color:var(--ink);font-weight:600}
+  #anaClose{position:absolute;top:12px;right:14px;background:none;border:none;
+    color:var(--dim);font-size:15px;cursor:pointer;font-family:inherit;padding:4px}
+  #anaClose:hover{color:var(--orange)}
+  #chartWrap{position:relative;margin:6px 0 4px}
+  #chartTip{position:absolute;display:none;pointer-events:none;
+    background:rgba(8,10,16,.95);border:1px solid rgba(255,165,77,.4);
+    font-family:Consolas,monospace;font-size:11px;color:var(--ink);
+    padding:6px 10px;white-space:nowrap;z-index:5;line-height:1.7}
+  #anaTable{width:100%;border-collapse:collapse;margin-top:14px;font-size:12px}
+  #anaTable th{font-size:10px;letter-spacing:2px;color:var(--dim);font-weight:400;
+    padding:6px 4px;border-bottom:1px solid rgba(232,222,208,.15);text-align:right}
+  #anaTable th:first-child{text-align:left}
+  #anaTable td{font-family:Consolas,monospace;padding:7px 4px;text-align:right;
+    border-bottom:1px solid rgba(232,222,208,.07);color:var(--ink)}
+  #anaTable td:first-child{text-align:left;font-family:inherit;color:var(--dim);
+    letter-spacing:1px}
+  #anaTable tr.hl td{color:var(--orange)}
+  #anaTable td .riskbar{display:inline-block;height:6px;vertical-align:middle;
+    margin-left:8px;background:var(--ash);opacity:.75}
+  #analysisBox .verdict{margin-top:16px;font-size:11.5px;color:var(--ink);
+    line-height:1.9;letter-spacing:1px;border-left:2px solid var(--orange-dim);
+    padding-left:12px}
+
+  #vignette{position:absolute;inset:0;z-index:5;pointer-events:none;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,5,.55) 100%)}
+
+  /* 实时壁纸模式：无操作时隐去全部界面 */
+  #header,#controls,#powerbox,#hint,#quote,#panelShow{transition:opacity 1.5s ease}
+  body.zen #header,body.zen #controls,body.zen #powerbox,
+  body.zen #hint,body.zen #quote,body.zen #panelShow{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="glc"></canvas>
+<canvas id="ov"></canvas>
+<div id="vignette"></div>
+
+<div class="ui" id="header">
+  <div id="titleblock">
+    <h1>灰烬双星计划</h1>
+    <div class="sub">ORBITAL PROBE CANNON · ASH TWIN PROJECT</div>
+    <div class="rule"></div>
+  </div>
+  <div id="stats">
+    <div class="stat"><div class="label">发射次数</div><div class="value hot" id="stAttempts">0</div></div>
+    <div class="stat"><div class="label">等效模拟时长</div><div class="value" id="stTime">0 分钟</div></div>
+    <div class="stat"><div class="label">功率 · 22分钟射程</div><div class="value" id="stPower">—</div></div>
+    <div class="stat"><div class="label">本次发射指向</div><div class="value" id="stAngle">—</div></div>
+  </div>
+</div>
+
+<div class="ui" id="hint">拖动旋转 · 滚轮缩放 · 🎯 瞄准模式下单击球面发射<br>实时模式：真实 22:00 循环 · 挂机自动存档 · 可配合 Lively Wallpaper 做动态壁纸</div>
+
+<div class="ui" id="controls">
+  <button id="btnBoost">⏩ 启动时间加速</button>
+  <button id="btnAim">🎯 手动瞄准</button>
+  <button id="btnPause">⏸ 暂停</button>
+  <button id="btnReal">🕰 实时模式</button>
+  <button id="btnAudio">🔇 音效</button>
+  <button id="btnAnalysis">📊 功率分析</button>
+  <button id="btnRestart">↻ 新宇宙</button>
+</div>
+
+<div class="ui" id="powerbox">
+  <div class="plabel">轨道炮功率 · 射程 ∝ √功率 · 松手后以同一宇宙重试</div>
+  <input type="range" id="powerSlider" min="25" max="300" step="5" value="100">
+  <div id="ticks">
+    <span style="left:27.3%">┃ 100% 亚罗上限</span>
+    <span style="left:93%">300% 极限 ┃</span>
+  </div>
+  <div id="powerReadout">—</div>
+  <div id="presets">
+    <button data-p="100">亚罗安全上限</button>
+    <button data-p="300">马洛 & 艾文斯</button>
+  </div>
+</div>
+
+<div class="ui" id="telemetry"></div>
+<div class="ui" id="statusline"></div>
+<div class="ui" id="loopclock"></div>
+<div class="ui" id="quote">“我们并没有失去这 22 分钟 —— 它们从未发生过。但答案，确实留了下来。”</div>
+
+<button id="panelShow">☰ 查看结算数据</button>
+<button id="btnStart">▶ 开始模拟</button>
+
+<div class="ui" id="panel">
+  <button id="panelClose">✕ 收起</button>
+
+  <div id="secFound">
+    <div class="eyebrow">DEEP SPACE ANOMALY LOCATED</div>
+    <h2>宇宙之眼 · 已定位</h2>
+    <div class="row"><span class="k">命中目标的发射</span><span class="v gold" id="pHit">—</span></div>
+    <div class="row"><span class="k">游戏正史对照</span><span class="v" id="pCanon">第 9,318,054 次</span></div>
+    <div class="row"><span class="k">总发射次数</span><span class="v" id="pTotal">—</span></div>
+    <div class="row"><span class="k">等效模拟时长（每循环 22 分钟）</span><span class="v" id="pTime">—</span></div>
+    <div class="row"><span class="k">宇宙之眼距离</span><span class="v" id="pDist">—</span></div>
+    <div class="row"><span class="k">使用功率 · 射程</span><span class="v" id="pPower">—</span></div>
+    <div class="row"><span class="k">目标指向</span><span class="v" id="pAngle">—</span></div>
+    <div class="row"><span class="k">意外发现</span><span class="v" id="pStranger">—</span></div>
+    <div id="coordBlock">
+      <div class="coordTitle">跃迁坐标 · VESSEL WARP COORDINATES</div>
+      <div id="glyphs"></div>
+      <div class="coordCap">经度 · 纬度 · 距离 —— 六点一笔连线，每枚 975 种，三枚共 9.27 亿组合<br>
+      分辨率：经 0.37° · 纬 0.18° · 距 44 km</div>
+    </div>
+    <div class="note">探测器发射装置已停机。恒星未被引爆。<br>在你的感知里，这一切只用了一瞬间。</div>
+    <button class="act" id="btnAgain">↻ 探索新的宇宙</button>
+  </div>
+
+  <div id="secLost" style="display:none">
+    <div class="eyebrow ash">NO SIGNAL · LOOP CONTINUES</div>
+    <h2 class="ash">循环仍在继续</h2>
+    <div class="row"><span class="k">已模拟循环</span><span class="v" id="qN">—</span></div>
+    <div class="row"><span class="k">等效模拟时长</span><span class="v" id="qTime">—</span></div>
+    <div class="row"><span class="k">当前功率 · 射程</span><span class="v" id="qPower">—</span></div>
+    <div class="row"><span class="k">宇宙之眼实际距离</span><span class="v" id="qDist">—</span></div>
+    <div class="row"><span class="k">命中所需最低功率</span><span class="v gold" id="qReq">—</span></div>
+    <div class="row"><span class="k">意外发现</span><span class="v" id="qStranger">—</span></div>
+    <div class="note">宇宙之眼在 22 分钟射程之外。无论再循环多少次，探测器都无法抵达。<br>
+    挪麦无法区分“还没找到”与“永远找不到”。<br>
+    拖动左下角滑钮提高功率，以同一宇宙重试。</div>
+    <button class="act" id="btnLostNew">↻ 放弃此宇宙 · 探索新宇宙</button>
+  </div>
+</div>
+
+<div id="analysis">
+  <div id="analysisBox">
+    <button id="anaClose">✕</button>
+    <h3>功率 – 命中概率分析</h3>
+    <div class="asub">REACH ∝ √POWER · PRIOR: TRUNCATED LOG-NORMAL d ∈ [0.45, 2.4] R₁₀₀ · CALIBRATED TO 9,318,054 LAUNCHES</div>
+    <div class="model">
+      <b>R₁₀₀</b> = 标准功率（亚罗设定的安全上限）下，探测器 22 分钟的航程。
+      动能与功率成正比，故 <b>射程 ∝ √功率</b>。宇宙之眼的距离先验由两条物理约束截断：
+      <b>内边界 0.45 R₁₀₀</b>——世代望远镜巡天一无所获，且信号测不出视差，更近必被发现；
+      <b>外边界 2.4 R₁₀₀</b>——宇宙之眼绕恒星运行，必须在恒星引力束缚范围内。
+      两界之间按信号强度估计取对数正态（峰值 1.1 R₁₀₀）。
+      三维立体角搜索：<b>命中所需循环数 ∝ 距离²</b>，方向可以靠无限循环穷举，
+      <b>射程不足却是无法靠循环弥补的</b>。
+      比例尺对标游戏正史：第 9,318,054 次发射命中 → 角容差 ≈ 0.00066 rad
+      → 距离 ≈ 1500 × 探测半径，据此取正史宇宙 d ≈ 1.35 R₁₀₀（R₁₀₀ ≈ 2.2 万 km，
+      所需功率 ≥183%——马洛与艾文斯的超载是必要的）。
+      注：宇宙之眼在游戏文件中是独立场景，无实体坐标，以上为自洽推算而非官方数据。
+      彩蛋：一艘光学隐形的遮蔽飞船完全静止地悬停在黄道面斜上方约 40°
+      （角截面 ≈ 0.03 rad，单发命中率 ≈ 2.3×10⁻⁴，约为宇宙之眼的两千倍）——
+      盲射穷举对隐形者一视同仁，它几乎总会先于宇宙之眼现形。
+    </div>
+    <div id="chartWrap"></div>
+    <div id="chartTip"></div>
+    <table id="anaTable">
+      <thead><tr>
+        <th>功率档位</th><th>射程 (R₁₀₀)</th><th>宇宙之眼在射程内</th><th>永续循环风险</th>
+      </tr></thead>
+      <tbody id="anaBody"></tbody>
+    </table>
+    <div class="verdict" id="anaVerdict">
+      在收紧后的先验下，从亚罗的安全上限（100%）超载到结构极限（300%），命中概率由
+      <b>42.0% 提升至 87.7%</b>——“永远困在循环里”的风险从
+      <b>58.0% 砍到 12.3%，降低近五倍</b>。收紧先验反而让超载更加必要：
+      峰值 1.1 R₁₀₀ 恰好压在标准射程边缘之外。而在时间循环内，轨道炮解体的代价为零：
+      发射完成后的 22 分钟终将被回溯，装置会随时间线一同复原。
+      超载只有收益，没有成本。<b>马洛与艾文斯是对的。</b>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const TWO_PI = Math.PI * 2;
+const LOOP_MIN = 22;
+
+// ---------- 物理模型 ----------
+// 先验：截断对数正态。内边界 = 世代望远镜巡天 + 信号无视差排除；
+// 外边界 = 恒星引力束缚极限（宇宙之眼必须绕恒星运行）；
+// 峰值 = 挪麦按信号强度衰减给出的最佳估计。
+const LOGN = { M: 1.1, S: 0.45, LO: 0.45, HI: 2.4 };
+function erf(x) {
+  const s = x < 0 ? -1 : 1; x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+    - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return s * y;
+}
+function Phi(z) { return 0.5 * (1 + erf(z / Math.SQRT2)); }
+const PHI_LO = Phi(Math.log(LOGN.LO / LOGN.M) / LOGN.S);
+const PHI_HI = Phi(Math.log(LOGN.HI / LOGN.M) / LOGN.S);
+function sampleD() {
+  for (;;) {
+    const u1 = Math.random(), u2 = Math.random();
+    const n = Math.sqrt(-2 * Math.log(u1 + 1e-12)) * Math.cos(TWO_PI * u2);
+    const d = LOGN.M * Math.exp(LOGN.S * n);
+    if (d >= LOGN.LO && d <= LOGN.HI) return d;
+  }
+}
+// 对标游戏正史：第 9,318,054 次发射命中。取正史宇宙 d = 1.35 R₁₀₀
+// （所需功率 ≥183%，解释了马洛与艾文斯的超载为何是必要的），
+// 反推 d = 1 R₁₀₀ 时的期望循环数。
+const GAME_N = 9318054;
+const D_CANON = 1.35;
+const MEAN_AT_1 = GAME_N / (D_CANON * D_CANON);   // ≈ 5.11e6（3D：∝ d²）
+const R100_KM = 22000;                            // 推算链给出的 R₁₀₀ ≈ 2.2 万 km
+function reachOf(p) { return Math.sqrt(p / 100); }
+function pReach(p) {
+  const r = reachOf(p);
+  if (r <= LOGN.LO) return 0;
+  if (r >= LOGN.HI) return 1;
+  return (Phi(Math.log(r / LOGN.M) / LOGN.S) - PHI_LO) / (PHI_HI - PHI_LO);
+}
+function reqPower(d) { return 100 * d * d; }
+function fmtKm(d) { return (d * R100_KM).toLocaleString('zh-CN', { maximumFractionDigits: 0 }) + ' km'; }
+const POWERS = [
+  { p: 50,  name: '保守功率' },
+  { p: 100, name: '亚罗安全上限' },
+  { p: 200, name: '超越规程' },
+  { p: 300, name: '马洛 & 艾文斯 · 结构极限' },
+];
+
+// ---------- WebGL ----------
+const glc = document.getElementById('glc');
+const gl = glc.getContext('webgl', { antialias: true, alpha: true });
+const ovc = document.getElementById('ov');
+const ov = ovc.getContext('2d');
+window.__diag = { glOK: !!gl, log: '' };
+
+const VSH = `attribute vec3 aPos;attribute vec4 aCol;uniform mat4 uVP;
+uniform float uPt;varying vec4 vCol;
+void main(){gl_Position=uVP*vec4(aPos,1.0);gl_PointSize=uPt;vCol=aCol;}`;
+const FSH = `precision mediump float;varying vec4 vCol;uniform float uAlpha;
+void main(){gl_FragColor=vec4(vCol.rgb,vCol.a*uAlpha);}`;
+
+function makeShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    window.__diag.log += gl.getShaderInfoLog(s);
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, makeShader(gl.VERTEX_SHADER, VSH));
+gl.attachShader(prog, makeShader(gl.FRAGMENT_SHADER, FSH));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+  window.__diag.log += gl.getProgramInfoLog(prog);
+gl.useProgram(prog);
+const aPos = gl.getAttribLocation(prog, 'aPos');
+const aCol = gl.getAttribLocation(prog, 'aCol');
+const uVP = gl.getUniformLocation(prog, 'uVP');
+const uPt = gl.getUniformLocation(prog, 'uPt');
+const uAlpha = gl.getUniformLocation(prog, 'uAlpha');
+gl.enableVertexAttribArray(aPos);
+gl.enableVertexAttribArray(aCol);
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE);   // 加色混合
+gl.disable(gl.DEPTH_TEST);
+
+const STRIDE = 28; // 7 floats
+function bindAndDraw(vbo, data, count, mode, pt, alpha) {
+  if (!count) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  if (data) gl.bufferData(gl.ARRAY_BUFFER, data, gl.STREAM_DRAW);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, STRIDE, 0);
+  gl.vertexAttribPointer(aCol, 4, gl.FLOAT, false, STRIDE, 12);
+  gl.uniform1f(uPt, pt || 1);
+  gl.uniform1f(uAlpha, alpha == null ? 1 : alpha);
+  gl.drawArrays(mode, 0, count);
+}
+const vboStars = gl.createBuffer();
+const vboWire = gl.createBuffer();
+const vboCloud = gl.createBuffer();
+const vboRecent = gl.createBuffer();
+const vboBurst = gl.createBuffer();
+const vboMisc = gl.createBuffer();
+
+// ---------- 矩阵 ----------
+function persp(fovy, asp, n, f) {
+  const t = 1 / Math.tan(fovy / 2), nf = 1 / (n - f);
+  return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) * nf, -1, 0, 0, 2 * f * n * nf, 0];
+}
+function lookAt(e, c, up) {
+  let zx = e[0] - c[0], zy = e[1] - c[1], zz = e[2] - c[2];
+  const zl = Math.hypot(zx, zy, zz); zx /= zl; zy /= zl; zz /= zl;
+  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+  const xl = Math.hypot(xx, xy, xz); xx /= xl; xy /= xl; xz /= xl;
+  const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+  return [xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0,
+    -(xx * e[0] + xy * e[1] + xz * e[2]),
+    -(yx * e[0] + yy * e[1] + yz * e[2]),
+    -(zx * e[0] + zy * e[1] + zz * e[2]), 1];
+}
+function mul4(a, b) {
+  const o = new Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  return o;
+}
+
+// ---------- 相机 ----------
+const FOV = 45 * Math.PI / 180;
+const cam = { yaw: 0.65, pitch: 0.32, dist: 5.2, vyaw: 0, vpitch: 0 };
+let VP = null, Fpx = 0;
+let W = 0, H = 0, DPR = 1;
+
+let camEye = [0, 0, 5];
+function updateCamera() {
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  camEye = [cam.dist * cp * Math.sin(cam.yaw), cam.dist * sp, cam.dist * cp * Math.cos(cam.yaw)];
+  VP = mul4(persp(FOV, W / H, 0.1, 120), lookAt(camEye, [0, 0, 0], [0, 1, 0]));
+  Fpx = (H / 2) / Math.tan(FOV / 2);
+}
+// ---------- 屏幕坐标 → 射程球面方向（手动瞄准用） ----------
+function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function cross3(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function norm3(v) {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
+function screenToDir(sx, sy, R) {
+  const E = camEye;
+  const fwd = norm3([-E[0], -E[1], -E[2]]);
+  const right = norm3(cross3(fwd, [0, 1, 0]));
+  const upv = cross3(right, fwd);
+  const tanF = Math.tan(FOV / 2);
+  const ndx = (sx / W) * 2 - 1, ndy = 1 - (sy / H) * 2;
+  const kx = ndx * tanF * (W / H), ky = ndy * tanF;
+  const rd = norm3([
+    fwd[0] + right[0] * kx + upv[0] * ky,
+    fwd[1] + right[1] * kx + upv[1] * ky,
+    fwd[2] + right[2] * kx + upv[2] * ky,
+  ]);
+  // 射线-球面求交；错过球面时取最近逼近点
+  const b = dot3(E, rd);
+  const disc = b * b - (dot3(E, E) - R * R);
+  const t = disc >= 0 ? (-b - Math.sqrt(disc)) : -b;
+  return norm3([E[0] + rd[0] * t, E[1] + rd[1] * t, E[2] + rd[2] * t]);
+}
+function project(v) {
+  const x = v[0], y = v[1], z = v[2];
+  const cx = VP[0] * x + VP[4] * y + VP[8] * z + VP[12];
+  const cy = VP[1] * x + VP[5] * y + VP[9] * z + VP[13];
+  const cw = VP[3] * x + VP[7] * y + VP[11] * z + VP[15];
+  if (cw <= 0.05 || !isFinite(cx + cy + cw)) return null;
+  return { x: (cx / cw * 0.5 + 0.5) * W, y: (0.5 - cy / cw * 0.5) * H, w: cw };
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  // 后台标签页/壁纸容器可能上报 0×0，下限保护避免透视矩阵出 NaN
+  W = Math.max(1, window.innerWidth); H = Math.max(1, window.innerHeight);
+  glc.width = W * DPR; glc.height = H * DPR;
+  glc.style.width = W + 'px'; glc.style.height = H + 'px';
+  ovc.width = W * DPR; ovc.height = H * DPR;
+  ovc.style.width = W + 'px'; ovc.style.height = H + 'px';
+  ov.setTransform(DPR, 0, 0, DPR, 0, 0);
+  gl.viewport(0, 0, glc.width, glc.height);
+  updateCamera();
+}
+window.addEventListener('resize', resize);
+
+// ---------- 随机数（可复现，用于终局重放全部轨迹） ----------
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+// 每次发射固定消耗 3 个随机数 → 球面均匀方向 + 射程抖动
+function attemptFrom(rng) {
+  const u = rng(), v = rng(), jit = 0.94 + 0.1 * rng();
+  const y = 2 * u - 1, r = Math.sqrt(Math.max(0, 1 - y * y)), ph = TWO_PI * v;
+  return { dir: [r * Math.cos(ph), y, r * Math.sin(ph)], jit };
+}
+function sphereDir() {
+  const y = 2 * Math.random() - 1, r = Math.sqrt(Math.max(0, 1 - y * y)),
+    ph = TWO_PI * Math.random();
+  return [r * Math.cos(ph), y, r * Math.sin(ph)];
+}
+
+// ---------- 静态几何：星空 / 射程球壳 ----------
+let starCount = 0;
+let starArr = null;
+function buildStars() {
+  const N = 900, arr = new Float32Array(N * 7);
+  const rng = mulberry32(20260709);
+  for (let i = 0; i < N; i++) {
+    const y = 2 * rng() - 1, rr = Math.sqrt(Math.max(0, 1 - y * y)), ph = TWO_PI * rng();
+    const R = 40;
+    const warm = rng() < 0.18;
+    const o = i * 7;
+    arr[o] = R * rr * Math.cos(ph); arr[o + 1] = R * y; arr[o + 2] = R * rr * Math.sin(ph);
+    if (warm) { arr[o + 3] = 1; arr[o + 4] = 0.8; arr[o + 5] = 0.63; }
+    else { arr[o + 3] = 0.82; arr[o + 4] = 0.86; arr[o + 5] = 1; }
+    arr[o + 6] = 0.25 + rng() * 0.5;
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboStars);
+  gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+  starCount = N;
+  starArr = arr;
+}
+
+// ---------- 濒死宇宙：循环中远方恒星逐颗超新星 ----------
+let starDeaths = [];    // 本循环的死亡日程 [{i, at, fired}]
+let starFlashes = [];   // 正在爆闪 [{i, t0}]
+const _starAlpha = new Float32Array(1);
+function scheduleStarDeaths() {
+  starDeaths = [];
+  const novaS = REALTIME ? 0.977 : 0.68;
+  const n = REALTIME ? 24 : 3;             // 实时模式 22 分钟里约 24 颗
+  for (let k = 0; k < n; k++) {
+    starDeaths.push({
+      i: (Math.random() * starCount) | 0,
+      at: 0.05 + Math.random() * (novaS - 0.1),
+      fired: false,
+    });
+  }
+}
+function killStar(i) {
+  _starAlpha[0] = 0.04;                    // 熄灭为余烬
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboStars);
+  gl.bufferSubData(gl.ARRAY_BUFFER, i * STRIDE + 24, _starAlpha);
+}
+function reviveStars() {                   // 时间回溯：死去的星星回来了
+  if (starArr) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, vboStars);
+    gl.bufferData(gl.ARRAY_BUFFER, starArr, gl.STATIC_DRAW);
+  }
+  starFlashes = [];
+  starDeaths = [];
+}
+
+// ---------- 玩具行星系（轨道次序/相对大小/开普勒周期比正确，绝对尺寸示意） ----------
+const PRNG_P = mulberry32(777);
+const PLANETS = [
+  { id: 'twins', name: '沙漏双星', orbit: 0.085, period: 47, ph: PRNG_P() * TWO_PI },
+  { id: 'th', name: '木炉星', orbit: 0.13, period: 90, r: 0.011,
+    ph: PRNG_P() * TWO_PI, cLight: '134,197,148', cDark: '30,79,58' },
+  { id: 'bh', name: '碎空星', orbit: 0.175, period: 140, r: 0.012,
+    ph: PRNG_P() * TWO_PI, cLight: '167,152,186', cDark: '52,44,66' },
+  { id: 'gd', name: '深巨星', orbit: 0.23, period: 212, r: 0.02,
+    ph: PRNG_P() * TWO_PI, cLight: '96,204,170', cDark: '18,84,76' },
+  { id: 'db', name: '黑棘星', orbit: 0.29, period: 300, r: 0.016,
+    ph: PRNG_P() * TWO_PI, cLight: '182,199,207', cDark: '73,88,97' },
+];
+const TWIN = { sep: 0.011, r: 0.0075, period: 9,
+  aLight: '229,190,133', aDark: '122,92,55',     // 灰烬双星（沙）
+  bLight: '214,127,80', bDark: '107,55,34' };    // 余烬双星（熔岩峡谷）
+const INTERLOPER = { a: 0.19, e: 0.68, period: 159, r: 0.005, incl: 0.22,
+  node: PRNG_P() * TWO_PI, M0: PRNG_P() * TWO_PI };
+
+function planetPos(p, t) {
+  const a = p.ph + TWO_PI * t / p.period;
+  return [Math.cos(a) * p.orbit, 0, Math.sin(a) * p.orbit];
+}
+function twinPositions(t) {
+  const bary = planetPos(PLANETS[0], t);
+  const a = TWO_PI * t / TWIN.period;
+  const ox = Math.cos(a) * TWIN.sep, oz = Math.sin(a) * TWIN.sep;
+  return [[bary[0] + ox, 0, bary[2] + oz], [bary[0] - ox, 0, bary[2] - oz]];
+}
+function interloperPos(t) {
+  const I = INTERLOPER;
+  const M = (I.M0 + TWO_PI * t / I.period) % TWO_PI;
+  let E = M;
+  for (let k = 0; k < 6; k++)
+    E = E - (E - I.e * Math.sin(E) - M) / (1 - I.e * Math.cos(E));
+  const xv = I.a * (Math.cos(E) - I.e);
+  const zv = I.a * Math.sqrt(1 - I.e * I.e) * Math.sin(E);
+  const cn = Math.cos(I.node), sn = Math.sin(I.node);
+  const x1 = xv * cn - zv * sn, z1 = xv * sn + zv * cn;
+  return [x1, z1 * Math.sin(I.incl), z1 * Math.cos(I.incl)];
+}
+
+// ---------- 量子卫月：未被观测时在六个位置间随机迁移 ----------
+const QM = { host: 1, r: 0.0065, orbitR: 0.034, period: 23, tilt: 0.5,
+  invisT: 0, ph: PRNG_P() * TWO_PI };
+const QM_HOSTS = ['twins', 'th', 'bh', 'gd', 'db', 'eye'];
+function qmHostPos(name, t) {
+  if (name === 'eye') {
+    if (S && S.revealed)
+      return [universe.dir[0] * universe.d, universe.dir[1] * universe.d,
+        universe.dir[2] * universe.d];
+    return null;   // 眼未被发现：卫月去了没人看得见的地方
+  }
+  if (name === 'twins') return planetPos(PLANETS[0], t);
+  return planetPos(PLANETS.find(q => q.id === name), t);
+}
+function qmPos(t) {
+  const hp = qmHostPos(QM_HOSTS[QM.host], t);
+  if (!hp) return null;
+  const a = QM.ph + TWO_PI * t / QM.period;
+  return [hp[0] + Math.cos(a) * QM.orbitR,
+    hp[1] + Math.sin(a) * QM.orbitR * Math.sin(QM.tilt),
+    hp[2] + Math.sin(a) * QM.orbitR * Math.cos(QM.tilt)];
+}
+function onScreen(pr) {
+  return pr && pr.x > -40 && pr.x < W + 40 && pr.y > -40 && pr.y < H + 40;
+}
+// 观测判定：在画面内、且未被任何天体圆面遮挡
+// 遮挡物：太阳、五颗行星（双星两颗）、闯入者、陌生人号（挡光的斗篷）
+let lastSunWorldR = 0.055;
+function occluders(t) {
+  const list = [{ pos: [0, 0, 0], r: lastSunWorldR }];
+  const [tA, tB] = twinPositions(t);
+  list.push({ pos: tA, r: TWIN.r }, { pos: tB, r: TWIN.r });
+  for (let i = 1; i < PLANETS.length; i++)
+    list.push({ pos: planetPos(PLANETS[i], t), r: PLANETS[i].r });
+  list.push({ pos: interloperPos(t), r: INTERLOPER.r });
+  const sg = universe.stranger;
+  list.push({
+    pos: [sg.dir[0] * sg.dist, sg.dir[1] * sg.dist, sg.dir[2] * sg.dist],
+    r: sg.r,
+  });
+  return list;
+}
+function observedPoint(pos) {
+  const pr = project(pos);
+  if (!pr || !onScreen(pr)) return false;
+  for (const o of occluders(S.time)) {
+    const po = project(o.pos);
+    if (!po || pr.w <= po.w) continue;   // 遮挡物必须严格更靠近相机
+    const rPx = o.r * Fpx / po.w;
+    if (Math.hypot(pr.x - po.x, pr.y - po.y) < rPx) return false;
+  }
+  return true;
+}
+function updateQuantumMoon(dt) {
+  if (!VP) return;
+  const pos = qmPos(S.time);
+  const visible = pos ? observedPoint(pos) : false;
+  if (visible) { QM.invisT = 0; return; }   // 被观测：绝不移动
+  QM.invisT += dt;
+  if (QM.invisT < 0.7) return;
+  QM.invisT = 0;
+  // 迁移目标同样必须处于未被观测状态
+  const cands = [];
+  for (let i = 0; i < QM_HOSTS.length; i++) {
+    if (i === QM.host) continue;
+    const hp = qmHostPos(QM_HOSTS[i], S.time);
+    if (!hp) { cands.push(i); continue; }   // 未发现的眼：永远无人观测
+    if (!observedPoint(hp)) cands.push(i);
+  }
+  if (cands.length) QM.host = cands[(Math.random() * cands.length) | 0];
+}
+
+// 轨道参考线
+const vboOrbits = gl.createBuffer();
+let orbitCount = 0;
+function buildOrbits() {
+  const verts = [], SEG = 128;
+  const push = (getPos) => {
+    for (let s = 0; s < SEG; s++) {
+      const p1 = getPos(s / SEG), p2 = getPos((s + 1) / SEG);
+      verts.push(p1[0], p1[1], p1[2], 1, 0.75, 0.5, 0.05);
+      verts.push(p2[0], p2[1], p2[2], 1, 0.75, 0.5, 0.05);
+    }
+  };
+  for (const p of PLANETS)
+    push(f => [Math.cos(f * TWO_PI) * p.orbit, 0, Math.sin(f * TWO_PI) * p.orbit]);
+  push(f => {   // 闯入者椭圆（偏近点角参数化）
+    const E = f * TWO_PI, I = INTERLOPER;
+    const xv = I.a * (Math.cos(E) - I.e);
+    const zv = I.a * Math.sqrt(1 - I.e * I.e) * Math.sin(E);
+    const cn = Math.cos(I.node), sn = Math.sin(I.node);
+    const x1 = xv * cn - zv * sn, z1 = xv * sn + zv * cn;
+    return [x1, z1 * Math.sin(I.incl), z1 * Math.cos(I.incl)];
+  });
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboOrbits);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+  orbitCount = verts.length / 7;
+}
+
+let wireCount = 0, wireBuiltFor = -1;
+function buildWire(radius) {
+  if (Math.abs(radius - wireBuiltFor) < 1e-6) return;
+  wireBuiltFor = radius;
+  const SEG = 96, circles = [];
+  // 三个大圆 + 两条纬线
+  circles.push((t) => [radius * Math.cos(t), 0, radius * Math.sin(t)]);
+  circles.push((t) => [radius * Math.cos(t), radius * Math.sin(t), 0]);
+  circles.push((t) => [0, radius * Math.cos(t), radius * Math.sin(t)]);
+  for (const lat of [0.5, -0.5]) {
+    const cr = radius * Math.cos(Math.asin(lat)), cy = radius * lat;
+    circles.push((t) => [cr * Math.cos(t), cy, cr * Math.sin(t)]);
+  }
+  const verts = [];
+  for (let ci = 0; ci < circles.length; ci++) {
+    const a = ci < 3 ? 0.16 : 0.08;
+    for (let s = 0; s < SEG; s++) {
+      const p1 = circles[ci](s / SEG * TWO_PI), p2 = circles[ci]((s + 1) / SEG * TWO_PI);
+      verts.push(p1[0], p1[1], p1[2], 1, 0.65, 0.3, a);
+      verts.push(p2[0], p2[1], p2[2], 1, 0.65, 0.3, a);
+    }
+  }
+  const arr = new Float32Array(verts);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboWire);
+  gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+  wireCount = verts.length / 7;
+}
+
+// ---------- 轨迹云（持久样本） ----------
+const CLOUD_CAP = 6000;
+let cloudCount = 0, cloudAlpha = 1;
+function cloudInit() {
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboCloud);
+  gl.bufferData(gl.ARRAY_BUFFER, CLOUD_CAP * 2 * STRIDE, gl.DYNAMIC_DRAW);
+  cloudCount = 0; cloudAlpha = 1;
+}
+const cloudStage = new Float32Array(14);
+function cloudAdd(dir, len) {
+  if (cloudCount >= CLOUD_CAP) return;
+  cloudStage.set([0, 0, 0, 1, 0.55, 0.25, 0.05,
+    dir[0] * len, dir[1] * len, dir[2] * len, 1, 0.55, 0.25, 0.05]);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboCloud);
+  gl.bufferSubData(gl.ARRAY_BUFFER, cloudCount * 2 * STRIDE, cloudStage);
+  cloudCount++;
+}
+
+// ---------- 历史轨迹抽样（供终局爆发；百万级发射无法逐条保存/重放） ----------
+const SAMP_CAP = 90000;
+const sampBuf = new Float32Array(SAMP_CAP * 4);
+let sampCount = 0, sampStride = 1;
+function sampReset() { sampCount = 0; sampStride = 1; }
+function sampAdd(at) {
+  if (sampCount >= SAMP_CAP) {
+    // 缓冲满：隔条抽稀一半，步长翻倍 → 始终是全历史的均匀抽样
+    for (let i = 0, j = 0; i < sampCount; i += 2, j++) {
+      sampBuf[j * 4] = sampBuf[i * 4]; sampBuf[j * 4 + 1] = sampBuf[i * 4 + 1];
+      sampBuf[j * 4 + 2] = sampBuf[i * 4 + 2]; sampBuf[j * 4 + 3] = sampBuf[i * 4 + 3];
+    }
+    sampCount = sampCount >> 1;
+    sampStride *= 2;
+  }
+  const o = sampCount * 4;
+  sampBuf[o] = at.dir[0]; sampBuf[o + 1] = at.dir[1];
+  sampBuf[o + 2] = at.dir[2]; sampBuf[o + 3] = at.jit;
+  sampCount++;
+}
+
+// ---------- 终局爆发（全部历史轨迹的均匀抽样） ----------
+let burstCount = 0;
+function buildBurst() {
+  if (!S || !sampCount) { burstCount = 0; return; }
+  const step = Math.max(1, Math.floor(sampCount / 45000));
+  const R = S.reach;
+  const est = Math.floor(sampCount / step) + 2;
+  const arr = new Float32Array(est * 2 * 7);
+  let k = 0, drawn = 0;
+  for (let i = 0; i < sampCount; i += step) {
+    const L = R * sampBuf[i * 4 + 3];
+    const bright = (drawn % 97 === 0); drawn++;
+    const cg = bright ? 0.84 : 0.59, cb = bright ? 0.59 : 0.27;
+    const ca = bright ? 0.17 : 0.028;
+    arr[k++] = 0; arr[k++] = 0; arr[k++] = 0;
+    arr[k++] = 1; arr[k++] = cg; arr[k++] = cb; arr[k++] = ca;
+    arr[k++] = sampBuf[i * 4] * L; arr[k++] = sampBuf[i * 4 + 1] * L;
+    arr[k++] = sampBuf[i * 4 + 2] * L;
+    arr[k++] = 1; arr[k++] = cg; arr[k++] = cb; arr[k++] = ca;
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, vboBurst);
+  gl.bufferData(gl.ARRAY_BUFFER, arr.subarray(0, k), gl.STATIC_DRAW);
+  burstCount = k / 7;
+}
+
+// ---------- 宇宙与模拟状态 ----------
+let POWER = 100;
+let universe = null;
+let S = null;
+
+function newUniverse() {
+  // 陌生人号：完全静止地悬停在黄道面斜上方约 40°，光学隐形。
+  // 角截面 ~0.03 rad → 单发命中率 ≈ 2.3e-4，约为宇宙之眼的两千倍。
+  const slat = (36 + Math.random() * 10) * Math.PI / 180;
+  const slon = Math.random() * TWO_PI;
+  universe = {
+    d: sampleD(),
+    dir: sphereDir(),
+    stranger: {
+      dir: [Math.cos(slat) * Math.cos(slon), Math.sin(slat),
+            Math.cos(slat) * Math.sin(slon)],
+      cosR: Math.cos(0.03),
+      dist: 0.36,                       // 悬停在黑棘星轨道外侧
+      r: Math.tan(0.03) * 0.36,         // 物理半径与命中截面一致
+    },
+  };
+}
+
+function initSim() {
+  const seed = (Math.random() * 2 ** 31) | 0;
+  const reach = reachOf(POWER);
+  const mean = MEAN_AT_1 * universe.d * universe.d;
+  S = {
+    seed,
+    rng: mulberry32(seed),
+    phase: 'standby',      // standby → slow → ramp → found | lost；aim 为手动瞄准
+    paused: false,
+    attempts: 0,
+    reach,
+    reachable: universe.d <= reach,
+    cosTol: Math.cos(2 / Math.sqrt(mean)),
+    meanRef: MEAN_AT_1 * Math.min(universe.d, reach) ** 2,
+    futileN: Math.max(3000000, Math.floor(2.5 * MEAN_AT_1 * reach * reach)),
+    minAttempts: 1200,
+    aps: 2,
+    apsAccum: 0,
+    slowIndex: 0,
+    slowT: 0,
+    slowLaunch: null,
+    recent: [],
+    lastDir: null,
+    foundT: -1,
+    lostT: -1,
+    success: null,
+    time: 0,
+    revealed: false,
+    strangerHits: 0,
+    strangerFirst: 0,
+    strangerMsgT: -99,
+    aimShot: null,
+    aimShots: 0,
+    aimResult: null,
+    lostGhost: false,
+    eclipseNoticed: false,
+  };
+  cloudInit();
+  sampReset();
+  reviveStars();
+  burstCount = 0;
+  document.getElementById('panel').classList.remove('show', 'lost');
+  document.getElementById('panelShow').style.display = 'none';
+  document.getElementById('btnBoost').style.display = '';
+  document.getElementById('btnPause').textContent = '⏸ 暂停';
+  setStatus('轨道探测炮就绪 · 功率 ' + POWER + '% · 点击「▶ 开始模拟」或「🎯 手动瞄准」');
+  buildChart();
+}
+
+const SLOW_LOOPS = 3;
+const SLOW_DUR = 3.6;
+const REAL_DUR = LOOP_MIN * 60;   // 实时模式：每循环真实 22 分钟
+let REALTIME = false;
+function setStatus(t) { document.getElementById('statusline').textContent = t; }
+
+// ---------- 单次发射 ----------
+function fireOne() {
+  const at = attemptFrom(S.rng);
+  S.attempts++;
+  S.lastDir = at.dir;
+  if (S.attempts % sampStride === 0) sampAdd(at);
+  // 陌生人号：光学迷彩挡得住望远镜，挡不住动能撞击
+  const sg = universe.stranger;
+  if (at.dir[0] * sg.dir[0] + at.dir[1] * sg.dir[1] + at.dir[2] * sg.dir[2] >= sg.cosR) {
+    S.strangerHits++;
+    if (!S.strangerFirst) {
+      S.strangerFirst = S.attempts;
+      S.strangerMsgT = S.time;
+      AudioSys.ping();
+      setStatus('异常读数 · 探测器在恒星近域撞上未知遮蔽物体 · 方位已记录');
+    }
+  }
+  if (S.reachable && S.attempts >= S.minAttempts) {
+    const dot = at.dir[0] * universe.dir[0] + at.dir[1] * universe.dir[1]
+      + at.dir[2] * universe.dir[2];
+    if (dot >= S.cosTol) onFound(at);
+  }
+  return at;
+}
+
+// 命中宇宙之眼（自动穷举与手动试射共用）
+function onFound(at) {
+  S.success = { dir: at.dir, jit: at.jit, index: S.attempts };
+  S.phase = 'found';
+  S.foundT = 0;
+  S.revealed = true;
+  document.body.classList.remove('zen');
+  AudioSys.found();
+  if (REALTIME) clearSave();   // 找到了：挂机结束，清除存档
+  buildBurst();
+  fillFoundPanel();
+  buildChart();
+  setStatus('信号确认 · 探测器已找到宇宙之眼 · 装置停机');
+  document.getElementById('btnBoost').style.display = 'none';
+  const panel = document.getElementById('panel');
+  panel.classList.remove('lost');
+  document.getElementById('secFound').style.display = '';
+  document.getElementById('secLost').style.display = 'none';
+  const pr = project([universe.dir[0], universe.dir[1], universe.dir[2]]);
+  panel.style.left = (W > 980) ? ((pr && pr.x > W / 2) ? '26%' : '74%') : '50%';
+  setTimeout(() => { if (S.phase === 'found') panel.classList.add('show'); }, 2800);
+}
+
+function enterLost() {
+  S.phase = 'lost';
+  S.lostT = 0;
+  S.revealed = true;
+  S.lostGhost = true;
+  document.body.classList.remove('zen');
+  AudioSys.lost();
+  fillLostPanel();
+  buildChart();
+  setStatus('超过决策阈值 · 始终无信号 · 宇宙之眼可能在射程之外');
+  document.getElementById('btnBoost').style.display = 'none';
+  const panel = document.getElementById('panel');
+  panel.classList.add('lost');
+  document.getElementById('secFound').style.display = 'none';
+  document.getElementById('secLost').style.display = '';
+  const pr = project(universe.dir);
+  panel.style.left = (W > 980) ? ((pr && pr.x > W / 2) ? '26%' : '74%') : '50%';
+  setTimeout(() => { if (S.phase === 'lost') panel.classList.add('show'); }, 2200);
+}
+
+// ---------- 格式化 ----------
+function fmtInt(n) { return n.toLocaleString('zh-CN'); }
+function fmtDuration(attempts) {
+  const min = attempts * LOOP_MIN;
+  if (min < 60) return min + ' 分钟';
+  const h = min / 60;
+  if (h < 48) return h.toFixed(1) + ' 小时';
+  const d = h / 24;
+  if (d < 365) return d.toFixed(1) + ' 天';
+  const y = d / 365.25;
+  const days = Math.floor((y - Math.floor(y)) * 365.25);
+  return '约 ' + fmtInt(Math.floor(y)) + ' 年 ' + days + ' 天';
+}
+function fmtDir(dir) {
+  if (!dir) return '—';
+  const lat = Math.asin(dir[1]) * 180 / Math.PI;
+  let lon = Math.atan2(dir[2], dir[0]) * 180 / Math.PI;
+  if (lon < 0) lon += 360;
+  return '经 ' + lon.toFixed(1) + '° 纬 ' + lat.toFixed(1) + '°';
+}
+function fillFoundPanel() {
+  document.getElementById('pHit').textContent = '第 ' + fmtInt(S.success.index) + ' 次';
+  document.getElementById('pTotal').textContent = fmtInt(S.success.index) + ' 次';
+  document.getElementById('pTime').textContent = fmtDuration(S.success.index);
+  document.getElementById('pDist').textContent =
+    universe.d.toFixed(2) + ' R₁₀₀ ≈ ' + fmtKm(universe.d);
+  document.getElementById('pPower').textContent =
+    POWER + '% · ' + S.reach.toFixed(2) + ' R₁₀₀';
+  document.getElementById('pAngle').textContent = fmtDir(universe.dir);
+  document.getElementById('pStranger').textContent = strangerSummary();
+  fillCoords();
+}
+
+// ---------- 挪麦跃迁坐标字形 ----------
+// 完全图 K6 上的一笔画简单路径（首尾节点小者在前去重）：共 975 种
+const PATHS = (() => {
+  const out = [], seq = [], used = new Array(6).fill(false);
+  (function dfs() {
+    if (seq.length >= 2 && seq[0] < seq[seq.length - 1]) out.push(seq.slice());
+    if (seq.length === 6) return;
+    for (let n = 0; n < 6; n++) if (!used[n]) {
+      used[n] = true; seq.push(n); dfs(); seq.pop(); used[n] = false;
+    }
+  })();
+  out.sort((a, b) => a.length - b.length || a.join('').localeCompare(b.join('')));
+  return out;
+})();
+function glyphIndexFor(v01) {
+  return Math.max(0, Math.min(PATHS.length - 1, Math.floor(v01 * PATHS.length)));
+}
+function hexPt(i, r) {
+  const a = -Math.PI / 2 + i * Math.PI / 3;
+  return [40 + r * Math.cos(a), 40 + r * Math.sin(a)];
+}
+function glyphSVG(seq, label) {
+  const R = 28;
+  let dots = '';
+  for (let i = 0; i < 6; i++) {
+    const [x, y] = hexPt(i, R);
+    const on = seq.includes(i);
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${on ? 3 : 1.8}"
+      fill="${on ? '#8ef0d0' : 'rgba(142,240,208,.25)'}"/>`;
+  }
+  const line = seq.map((n, i) => {
+    const [x, y] = hexPt(n, R);
+    return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join('');
+  let hex = '';
+  for (let i = 0; i <= 6; i++) {
+    const [x, y] = hexPt(i % 6, R + 7);
+    hex += (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }
+  return `<div style="text-align:center">
+    <svg viewBox="0 0 80 80" width="70" height="70">
+      <path d="${hex}Z" fill="none" stroke="rgba(142,240,208,.22)" stroke-width="1"/>
+      <path d="${line}" fill="none" stroke="#8ef0d0" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"
+        style="filter:drop-shadow(0 0 4px rgba(142,240,208,.55))"/>
+      ${dots}
+    </svg>
+    <div style="font-size:9px;letter-spacing:3px;color:#9a8f80;margin-top:2px">${label}</div>
+  </div>`;
+}
+function fillCoords() {
+  const dir = universe.dir;
+  let lon = Math.atan2(dir[2], dir[0]) / TWO_PI; if (lon < 0) lon += 1;
+  const lat = (Math.asin(dir[1]) + Math.PI / 2) / Math.PI;
+  const dd = (universe.d - LOGN.LO) / (LOGN.HI - LOGN.LO);
+  document.getElementById('glyphs').innerHTML =
+    glyphSVG(PATHS[glyphIndexFor(lon)], '经度') +
+    glyphSVG(PATHS[glyphIndexFor(lat)], '纬度') +
+    glyphSVG(PATHS[glyphIndexFor(dd)], '距离');
+}
+function strangerSummary() {
+  return S.strangerHits
+    ? '陌生人号 · 首见第 ' + fmtInt(S.strangerFirst) + ' 次 · 共 ' + fmtInt(S.strangerHits) + ' 枚'
+    : '无（陌生人号躲过了这个宇宙）';
+}
+function fillLostPanel() {
+  document.getElementById('qPower').textContent =
+    POWER + '% · ' + S.reach.toFixed(2) + ' R₁₀₀';
+  document.getElementById('qDist').textContent =
+    universe.d.toFixed(2) + ' R₁₀₀ ≈ ' + fmtKm(universe.d);
+  document.getElementById('qReq').textContent =
+    '≥ ' + Math.ceil(reqPower(universe.d)) + '%';
+  document.getElementById('qStranger').textContent = strangerSummary();
+}
+
+// ---------- 更新 ----------
+function update(dt) {
+  S.time += dt;
+  updateQuantumMoon(dt);
+
+  if (S.phase === 'slow') {
+    S.slowT += dt;
+    const dur = REALTIME ? REAL_DUR : SLOW_DUR;
+    const novaS = REALTIME ? 0.977 : 0.68;   // 实时模式超新星约占最后 30 秒
+    const p = S.slowT / dur;
+    if (!S.slowLaunch && p < 1) {
+      S.slowLaunch = fireOne();
+      cloudAdd(S.slowLaunch.dir, S.reach * S.slowLaunch.jit);
+      AudioSys.whoosh();
+      scheduleStarDeaths();
+      setStatus('循环 ' + fmtInt(S.attempts) + ' · 探测器已发射 · 等待恒星坍缩…');
+    }
+    // 濒死宇宙：到点的恒星爆发并熄灭
+    for (const d of starDeaths) {
+      if (!d.fired && p >= d.at) {
+        d.fired = true;
+        killStar(d.i);
+        starFlashes.push({ i: d.i, t0: S.time });
+      }
+    }
+    if (p >= novaS && p < 1 && S.slowLaunch && !S.slowLaunch.nova) {
+      S.slowLaunch.nova = true;
+      AudioSys.nova();
+      setStatus('超新星爆发 · 能量峰值 · 数据回溯 22 分钟');
+    }
+    if (p >= 1) {
+      S.slowT = 0; S.slowIndex++; S.slowLaunch = null;
+      reviveStars();   // 时间回溯：这 22 分钟里死去的星星全部回来
+      if (REALTIME) saveState();
+      else if (S.slowIndex >= SLOW_LOOPS && S.phase === 'slow') {
+        S.phase = 'ramp';
+        setStatus('时间加速协议已启动 · 高速模拟中');
+      }
+    }
+  }
+  else if (S.phase === 'ramp') {
+    const cap = S.attempts > 2 * S.meanRef + 100000 ? 8000000 : 3000000;
+    S.aps = Math.min(cap, S.aps * Math.pow(1.9, dt * 3.0));
+    S.apsAccum += S.aps * dt;
+    let n = Math.floor(S.apsAccum);
+    S.apsAccum -= n;
+    const drawEvery = Math.max(1, Math.floor(n / 26));
+    for (let i = 0; i < n; i++) {
+      const at = fireOne();
+      if (S.phase !== 'ramp') break;
+      if (i % drawEvery === 0) S.recent.push({ ...at, born: S.time });
+      if (S.attempts % 13 === 0) cloudAdd(at.dir, S.reach * at.jit);
+    }
+    while (S.recent.length > 420) S.recent.shift();
+
+    if (S.phase === 'ramp') {
+      if (!S.reachable && S.attempts >= S.futileN) enterLost();
+      else if (S.time - S.strangerMsgT < 3) { /* 保留异常读数提示 */ }
+      else if (S.attempts > S.futileN * 0.72)
+        setStatus(fmtInt(S.attempts) + ' 次循环 · 依然没有任何信号……');
+      else if (S.attempts > S.futileN * 0.4)
+        setStatus('仍无信号 · 挪麦开始担忧……');
+    }
+  }
+  else if (S.phase === 'found') {
+    S.foundT += dt;
+    if (S.foundT > 0.4 && cloudAlpha > 0)
+      cloudAlpha = Math.max(0, cloudAlpha - dt * 0.7);
+  }
+  else if (S.phase === 'lost') {
+    S.lostT += dt;
+    if (S.lostT > 0.2 && cloudAlpha > 0.3)
+      cloudAlpha = Math.max(0.3, cloudAlpha - dt * 0.5);
+    S.apsAccum += 1200 * dt;
+    let n = Math.floor(S.apsAccum);
+    S.apsAccum -= n;
+    for (let i = 0; i < n; i++) {
+      const at = attemptFrom(S.rng);
+      S.attempts++;
+      S.lastDir = at.dir;
+      if (i % 40 === 0) S.recent.push({ ...at, born: S.time });
+    }
+    document.getElementById('qN').textContent = fmtInt(S.attempts) + ' 次（仍在增加）';
+    document.getElementById('qTime').textContent = fmtDuration(S.attempts);
+  }
+  else if (S.phase === 'aim') {
+    // 准星实时跟随（依赖相机姿态，需逐帧重算）
+    if (lastMouse) aimDir = screenToDir(lastMouse.x, lastMouse.y, S.reach);
+    if (S.aimShot && !S.aimShot.done && S.time - S.aimShot.t0 >= 2.6) {
+      S.aimShot.done = true;
+      resolveAimShot(S.aimShot);
+    }
+  }
+
+  S.recent = S.recent.filter(r => S.time - r.born < 0.38);
+
+  document.getElementById('stAttempts').textContent = fmtInt(S.attempts);
+  document.getElementById('stTime').textContent = fmtDuration(S.attempts);
+  document.getElementById('stPower').textContent =
+    POWER + '% · ' + S.reach.toFixed(2) + ' R₁₀₀';
+  document.getElementById('stAngle').textContent = fmtDir(S.lastDir);
+
+  const clock = document.getElementById('loopclock');
+  if (S.phase === 'slow') {
+    const remain = Math.max(0, 1 - S.slowT
+      / ((REALTIME ? REAL_DUR : SLOW_DUR) * (REALTIME ? 0.977 : 0.68))) * LOOP_MIN * 60;
+    const m = Math.floor(remain / 60), s = Math.floor(remain % 60);
+    clock.textContent = '循环剩余  ' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  } else if (S.phase === 'ramp') {
+    clock.textContent = '每秒 ' + fmtInt(Math.floor(S.aps)) + ' 个循环 · 每循环 22:00';
+  } else if (S.phase === 'found') {
+    clock.textContent = '装置已停机 · 循环终止';
+  } else if (S.phase === 'standby') {
+    clock.textContent = '待命 · 装置就绪';
+  } else if (S.phase === 'aim') {
+    clock.textContent = '手动瞄准 · 拖动旋转 · 单击发射 · 试射 #' + (S.aimShots + 1);
+  } else {
+    clock.textContent = '装置无法自行停机 · 循环永不终止';
+  }
+
+  // 探测追踪模块 · 实时遥测
+  const tele = document.getElementById('telemetry');
+  if (S.phase === 'slow' && S.slowLaunch) {
+    const dur = REALTIME ? REAL_DUR : SLOW_DUR;
+    const flyFrac = REALTIME ? 0.75 : 0.42;
+    const p = S.slowT / dur;
+    const at = S.slowLaunch;
+    const flyP = ease(Math.min(1, p / flyFrac));
+    const fullKm = S.reach * at.jit * R100_KM;
+    const km = fullKm * flyP;
+    if (p < flyFrac) {
+      let eta = '';
+      if (REALTIME) {
+        const s = Math.max(0, (flyFrac - p) * dur);
+        eta = ' · 抵达边界 ' + String(Math.floor(s / 60)).padStart(2, '0')
+          + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+      }
+      tele.textContent = '探测追踪模块 · 已飞行 ' + fmtInt(Math.round(km))
+        + ' / ' + fmtInt(Math.round(fullKm)) + ' km · '
+        + Math.round(flyP * 100) + '% · '
+        + (S.reach * R100_KM / REAL_DUR).toFixed(1) + ' km/s' + eta;
+    } else if (!at.nova) {
+      tele.textContent = '探测追踪模块 · 已抵达射程边界 '
+        + fmtInt(Math.round(fullKm)) + ' km · 未发现信号 · 等待恒星坍缩';
+    } else {
+      tele.textContent = '探测追踪模块 · 数据封存 · 经由灰烬双星回传至 22 分钟前';
+    }
+  } else if (S.phase === 'aim') {
+    if (S.aimShot && !S.aimShot.done) {
+      tele.textContent = '试射飞行中 · ' + fmtDir(S.aimShot.dir);
+    } else if (S.aimResult) {
+      tele.textContent = S.aimResult;
+    } else {
+      tele.textContent = '瞄准方位 ' + fmtDir(aimDir) + ' · 单击发射';
+    }
+  } else {
+    tele.textContent = '';
+  }
+}
+
+// ---------- 手动试射结算 ----------
+function resolveAimShot(sh) {
+  S.aimShots++;
+  S.attempts++;               // 试射同样消耗一个 22 分钟循环
+  S.lastDir = sh.dir;
+  const dcos = Math.max(-1, Math.min(1,
+    sh.dir[0] * universe.dir[0] + sh.dir[1] * universe.dir[1]
+    + sh.dir[2] * universe.dir[2]));
+  const err = Math.acos(dcos);
+  const tol = Math.acos(Math.max(-1, Math.min(1, S.cosTol)));
+  const errDeg = err * 180 / Math.PI, tolDeg = tol * 180 / Math.PI;
+  if (err <= tol && S.reachable) {
+    onFound({ dir: sh.dir, jit: 1 });
+    setStatus('试射 #' + S.aimShots + ' · 你亲手命中了宇宙之眼 · 挪麦会为你立一面螺旋墙');
+    return;
+  }
+  if (err <= tol) {
+    AudioSys.ping();
+    setStatus('试射 #' + S.aimShots + ' · 方向完美命中！但宇宙之眼在射程之外 · 需要功率 ≥ '
+      + Math.ceil(reqPower(universe.d)) + '%');
+    S.aimResult = '方向对了，够不着——这就是马洛与艾文斯超载轨道炮的理由';
+    return;
+  }
+  const ratio = err / tol;
+  setStatus('试射 #' + S.aimShots + ' · 偏差 ' + errDeg.toFixed(2)
+    + '° · 命中需 < ' + tolDeg.toFixed(3) + '° · 还差 '
+    + fmtInt(Math.round(ratio)) + ' 倍精度');
+  S.aimResult = '你的误差圈内仍有约 ' + fmtInt(Math.round(ratio * ratio))
+    + ' 个候选方位 · 盲射穷举期望 '
+    + fmtInt(Math.round(MEAN_AT_1 * universe.d * universe.d)) + ' 次循环';
+}
+
+// ---------- 绘制 ----------
+function ease(t) { return t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t); }
+
+const previewReach = () => reachOf(POWER);
+
+function draw() {
+  updateCamera();
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  ov.clearRect(0, 0, W, H);
+
+  const vpArr = new Float32Array(VP);
+  gl.uniformMatrix4fv(uVP, false, vpArr);
+
+  // 星空（整体微闪）
+  bindAndDraw(vboStars, null, starCount, gl.POINTS, 2.2,
+    0.8 + 0.15 * Math.sin(S.time * 1.1));
+
+  // 行星轨道参考线
+  if (orbitCount) bindAndDraw(vboOrbits, null, orbitCount, gl.LINES, 1, 1);
+
+  // 射程球壳（拖动滑钮时实时预览）
+  buildWire(previewReach());
+  bindAndDraw(vboWire, null, wireCount, gl.LINES, 1, 1);
+
+  // 轨迹云
+  if (cloudCount) bindAndDraw(vboCloud, null, cloudCount * 2, gl.LINES, 1, cloudAlpha);
+
+  // 高速阶段瞬时轨迹
+  if (S.recent.length) {
+    const arr = new Float32Array(S.recent.length * 14);
+    let k = 0;
+    for (const r of S.recent) {
+      const age = (S.time - r.born) / 0.38;
+      const a = 0.4 * (1 - age);
+      const L = S.reach * r.jit;
+      arr[k++] = 0; arr[k++] = 0; arr[k++] = 0;
+      arr[k++] = 1; arr[k++] = 0.67; arr[k++] = 0.35; arr[k++] = a;
+      arr[k++] = r.dir[0] * L; arr[k++] = r.dir[1] * L; arr[k++] = r.dir[2] * L;
+      arr[k++] = 1; arr[k++] = 0.67; arr[k++] = 0.35; arr[k++] = a;
+    }
+    bindAndDraw(vboRecent, arr, S.recent.length * 2, gl.LINES, 1, 1);
+  }
+
+  // ---- 终局爆发层 ----
+  if (S.phase === 'found' && burstCount) {
+    const ft = S.foundT;
+    let burstA = 0;
+    if (ft < 0.5) burstA = ease(ft / 0.5);
+    else if (ft < 1.4) burstA = 1;
+    else burstA = Math.max(0, 1 - (ft - 1.4) / 2.2);
+    if (burstA > 0) bindAndDraw(vboBurst, null, burstCount, gl.LINES, 1, burstA);
+  }
+
+  // ================= 2D 覆盖层 =================
+  const pSun = project([0, 0, 0]);
+
+  // 慢速阶段：探测器 + 超新星
+  if (S.phase === 'slow' && S.slowLaunch && pSun) {
+    const p = S.slowT / (REALTIME ? REAL_DUR : SLOW_DUR);
+    const novaS = REALTIME ? 0.977 : 0.68;
+    const at = S.slowLaunch;
+    const flyP = ease(Math.min(1, p / (REALTIME ? 0.75 : 0.42)));
+    const Lfull = S.reach * at.jit;
+    const L = Lfull * flyP;
+    const tip = [at.dir[0] * L, at.dir[1] * L, at.dir[2] * L];
+    const pt = project(tip);
+    // 实时模式：发射时即画出整条航线预划虚线（弹道在发射瞬间已确定）
+    if (REALTIME) {
+      const tf = project([at.dir[0] * Lfull, at.dir[1] * Lfull, at.dir[2] * Lfull]);
+      if (tf) {
+        ov.save();
+        ov.setLineDash([2, 8]);
+        ov.strokeStyle = 'rgba(255,165,77,0.20)';
+        ov.lineWidth = 1;
+        ov.beginPath(); ov.moveTo(pSun.x, pSun.y); ov.lineTo(tf.x, tf.y); ov.stroke();
+        ov.restore();
+      }
+    }
+    if (pt && L > 0.001) {
+      const g = ov.createLinearGradient(pSun.x, pSun.y, pt.x, pt.y);
+      g.addColorStop(0, 'rgba(255,160,80,0)');
+      g.addColorStop(0.6, `rgba(255,170,90,${REALTIME ? 0.55 : 0.35})`);
+      g.addColorStop(1, 'rgba(255,220,170,0.95)');
+      ov.beginPath(); ov.moveTo(pSun.x, pSun.y); ov.lineTo(pt.x, pt.y);
+      ov.strokeStyle = g; ov.lineWidth = 2; ov.lineCap = 'round'; ov.stroke();
+      ov.save();
+      ov.shadowColor = '#ffce9e'; ov.shadowBlur = 16;
+      ov.beginPath(); ov.arc(pt.x, pt.y, REALTIME ? 4 : 3.2, 0, TWO_PI);
+      ov.fillStyle = '#fff3e0'; ov.fill();
+      // 位置脉冲环：让缓慢爬行的探测器一眼可寻
+      if (REALTIME) {
+        const pp = (S.time % 4) / 4;
+        ov.shadowBlur = 0;
+        ov.beginPath(); ov.arc(pt.x, pt.y, 5 + pp * 20, 0, TWO_PI);
+        ov.strokeStyle = `rgba(255,206,158,${0.5 * (1 - pp)})`;
+        ov.lineWidth = 1;
+        ov.stroke();
+        // 随行里程标签
+        ov.fillStyle = 'rgba(255,220,170,0.75)';
+        ov.font = '10px Consolas, monospace';
+        ov.textAlign = 'left';
+        ov.fillText(fmtInt(Math.round(L * R100_KM)) + ' km', pt.x + 13, pt.y - 9);
+      }
+      ov.restore();
+    }
+    if (p >= novaS) {
+      const np = ease((p - novaS) / (1 - novaS));
+      const NR = 26 + np * Math.max(W, H) * 0.85;
+      const alpha = np < 0.55 ? 1 : (1 - (np - 0.55) / 0.45);
+      const g = ov.createRadialGradient(pSun.x, pSun.y, 0, pSun.x, pSun.y, NR);
+      g.addColorStop(0, `rgba(235,245,255,${0.95 * alpha})`);
+      g.addColorStop(0.35, `rgba(150,200,255,${0.55 * alpha})`);
+      g.addColorStop(0.8, `rgba(80,130,230,${0.18 * alpha})`);
+      g.addColorStop(1, 'rgba(40,80,200,0)');
+      ov.beginPath(); ov.arc(pSun.x, pSun.y, NR, 0, TWO_PI);
+      ov.fillStyle = g; ov.fill();
+    }
+  }
+
+  // 濒死宇宙：远方恒星的超新星爆闪
+  if (starFlashes.length) {
+    const fdur = REALTIME ? 4.5 : 0.9;
+    starFlashes = starFlashes.filter(f => S.time - f.t0 < fdur);
+    for (const f of starFlashes) {
+      const o = f.i * 7;
+      const pp = project([starArr[o], starArr[o + 1], starArr[o + 2]]);
+      if (!pp) continue;
+      const ag = (S.time - f.t0) / fdur;
+      const r = 2.5 + 22 * ease(ag);
+      const al = (1 - ag) * 0.9;
+      const g2 = ov.createRadialGradient(pp.x, pp.y, 0, pp.x, pp.y, r);
+      g2.addColorStop(0, `rgba(240,248,255,${al})`);
+      g2.addColorStop(0.4, `rgba(160,205,255,${al * 0.6})`);
+      g2.addColorStop(1, 'rgba(80,120,230,0)');
+      ov.beginPath(); ov.arc(pp.x, pp.y, r, 0, TWO_PI);
+      ov.fillStyle = g2; ov.fill();
+    }
+  }
+
+  // ---- 行星系 + 恒星（按深度排序，远者先画） ----
+  {
+    let sp = 0.12;
+    if (S.phase === 'slow') {
+      const novaS = REALTIME ? 0.977 : 0.68;
+      sp = Math.min(1, (S.slowT / (REALTIME ? REAL_DUR : SLOW_DUR)) / novaS);
+    } else if (S.phase === 'ramp') {
+      sp = 0.3 + 0.06 * Math.sin(S.time * 18);   // 高速蒙太奇：亿万次演化的残影
+    }
+    // 当前太阳的世界半径（红巨星吞噬判定 + 量子卫月遮挡判定共用）
+    const g0 = ease(sp), cp0 = ease(Math.max(0, (sp - 0.97) / 0.03));
+    const sunWorldR = 0.055 * (1 + 2.3 * Math.pow(g0, 1.6)) * (1 - 0.72 * cp0);
+    lastSunWorldR = sunWorldR;
+
+    const bodies = [];
+    if (pSun) bodies.push({ w: pSun.w, fn: () => drawSun(pSun, Fpx / pSun.w, sp) });
+
+    const pushPlanet = (pos, r, cL, cD, id) => {
+      const orbitR = Math.hypot(pos[0], pos[2]);
+      if (orbitR < sunWorldR) return null;   // 已被红巨星吞没
+      const pr = project(pos);
+      if (!pr) return null;
+      const rpx = Math.max(1.6, r * Fpx / pr.w);
+      bodies.push({ w: pr.w, fn: () => drawPlanet(pr, rpx, cL, cD, id, pSun) });
+      return pr;
+    };
+    // 沙漏双星（灰烬 + 余烬 + 沙流）
+    const [tA, tB] = twinPositions(S.time);
+    const prA = pushPlanet(tA, TWIN.r, TWIN.aLight, TWIN.aDark, 'twinA');
+    const prB = pushPlanet(tB, TWIN.r, TWIN.bLight, TWIN.bDark, 'twinB');
+    if (prA && prB) bodies.push({
+      w: Math.max(prA.w, prB.w) - 1e-4,
+      fn: () => {
+        ov.strokeStyle = 'rgba(229,190,133,0.4)';
+        ov.lineWidth = 1;
+        ov.beginPath(); ov.moveTo(prA.x, prA.y); ov.lineTo(prB.x, prB.y); ov.stroke();
+      },
+    });
+    // 其余行星 + 环绕深巨星的轨道炮
+    for (let i = 1; i < PLANETS.length; i++) {
+      const p = PLANETS[i];
+      const pos = planetPos(p, S.time);
+      const pr = pushPlanet(pos, p.r, p.cLight, p.cDark, p.id);
+      if (p.id === 'gd' && pr) {
+        const ca = S.time * 0.7;
+        const cpr = project([pos[0] + Math.cos(ca) * 0.032, pos[1],
+          pos[2] + Math.sin(ca) * 0.032]);
+        if (cpr) bodies.push({
+          w: cpr.w,
+          fn: () => {
+            ov.save();
+            ov.shadowColor = '#cfe4ff'; ov.shadowBlur = 8;
+            ov.beginPath(); ov.arc(cpr.x, cpr.y, 2.2, 0, TWO_PI);
+            ov.fillStyle = '#dceaff'; ov.fill();
+            ov.restore();
+          },
+        });
+      }
+    }
+    // 闯入者（彗星 + 背阳彗尾，近日时尾更长）
+    {
+      const pos = interloperPos(S.time);
+      const dist = Math.hypot(pos[0], pos[1], pos[2]);
+      const pr = dist > sunWorldR ? project(pos) : null;
+      if (pr) {
+        const rpx = Math.max(1.4, INTERLOPER.r * Fpx / pr.w);
+        bodies.push({
+          w: pr.w,
+          fn: () => {
+            const away = norm3(pos);
+            const tail = 0.05 * (0.35 / Math.max(0.08, dist));
+            const tp = project([pos[0] + away[0] * tail,
+              pos[1] + away[1] * tail, pos[2] + away[2] * tail]);
+            if (tp) {
+              const tg = ov.createLinearGradient(pr.x, pr.y, tp.x, tp.y);
+              tg.addColorStop(0, 'rgba(200,225,255,0.55)');
+              tg.addColorStop(1, 'rgba(200,225,255,0)');
+              ov.strokeStyle = tg;
+              ov.lineWidth = Math.max(1.5, rpx * 0.9);
+              ov.lineCap = 'round';
+              ov.beginPath(); ov.moveTo(pr.x, pr.y); ov.lineTo(tp.x, tp.y); ov.stroke();
+            }
+            drawPlanet(pr, rpx, '236,246,255', '132,158,178', 'comet', pSun);
+          },
+        });
+      }
+    }
+    // 量子卫月（含微光闪烁）
+    {
+      const pos = qmPos(S.time);
+      const pr = pos && project(pos);
+      if (pr) {
+        const rpx = Math.max(1.5, QM.r * Fpx / pr.w);
+        bodies.push({
+          w: pr.w,
+          fn: () => {
+            ov.save();
+            ov.globalAlpha = 0.75 + 0.25 * Math.sin(S.time * 6.5);
+            drawPlanet(pr, rpx, '206,196,224', '96,88,120', 'qm', pSun);
+            ov.restore();
+          },
+        });
+      }
+    }
+    // 陌生人号：光学迷彩 = 不发光的纯黑剪影
+    // 衬着星空时隐形，滑过太阳圆面时才显形为一块缺口
+    {
+      const sg = universe.stranger;
+      const pos = [sg.dir[0] * sg.dist, sg.dir[1] * sg.dist, sg.dir[2] * sg.dist];
+      const pr = project(pos);
+      if (pr) {
+        const rpx = Math.max(2, sg.r * Fpx / pr.w);
+        // 日食检测：从相机看，剪影与太阳圆面重叠 → 彩蛋提示（每宇宙一次）
+        if (pSun && pr.w < pSun.w && !S.eclipseNoticed) {
+          const rSunPx = sunWorldR * Fpx / pSun.w;
+          if (Math.hypot(pr.x - pSun.x, pr.y - pSun.y) < (rSunPx + rpx) * 0.75) {
+            S.eclipseNoticed = true;
+            AudioSys.ping();
+            setStatus('……有什么东西咬掉了太阳的一角。');
+          }
+        }
+        bodies.push({
+          w: pr.w,
+          fn: () => {
+            ov.save();
+            ov.translate(pr.x, pr.y);
+            ov.rotate(0.35);
+            ov.scale(1, 0.86);   // 环形结构的侧影：略扁
+            ov.beginPath(); ov.arc(0, 0, rpx, 0, TWO_PI);
+            ov.fillStyle = '#05070f';
+            ov.fill();
+            ov.restore();
+            // 被探测器撞破后：轮廓与读数标注常驻
+            if (S.strangerHits > 0) {
+              ov.save();
+              ov.translate(pr.x, pr.y);
+              ov.rotate(0.35);
+              ov.scale(1, 0.86);
+              ov.beginPath(); ov.arc(0, 0, rpx * 1.12, 0, TWO_PI);
+              ov.strokeStyle = 'rgba(150,220,190,0.7)';
+              ov.lineWidth = 1.4; ov.stroke();
+              ov.restore();
+              if (rpx > 3) {
+                ov.font = '10px Consolas, monospace';
+                ov.textAlign = 'center';
+                ov.fillStyle = 'rgba(150,220,190,0.75)';
+                ov.fillText('未知遮蔽物体 · ' + fmtInt(S.strangerHits) + ' 次异常读数',
+                  pr.x, pr.y + rpx + 16);
+              }
+              const dt1 = S.time - S.strangerMsgT;
+              if (dt1 >= 0 && dt1 < 2) {
+                ov.beginPath(); ov.arc(pr.x, pr.y, rpx + dt1 * 34, 0, TWO_PI);
+                ov.strokeStyle = `rgba(150,220,190,${0.6 * (1 - dt1 / 2)})`;
+                ov.lineWidth = 1; ov.stroke();
+              }
+            }
+          },
+        });
+      }
+    }
+    bodies.sort((a, b) => b.w - a.w);
+    for (const b of bodies) b.fn();
+  }
+
+  // 射程标注
+  {
+    const top = project([0, previewReach() * 1.04, 0]);
+    if (top) {
+      ov.fillStyle = 'rgba(200,160,120,0.6)';
+      ov.font = '10px Consolas, monospace';
+      ov.textAlign = 'center';
+      ov.fillText('22 分钟射程 · ' + POWER + '%', top.x, top.y - 6);
+    }
+  }
+
+
+  // ---- 终局：找到 ----
+  if (S.phase === 'found' && pSun) {
+    const ft = S.foundT;
+    const flash = ft < 0.25 ? ft / 0.25 : Math.max(0, 1 - (ft - 0.25) / 0.9);
+    if (flash > 0) {
+      const g = ov.createRadialGradient(pSun.x, pSun.y, 0, pSun.x, pSun.y, Math.max(W, H) * 0.8);
+      g.addColorStop(0, `rgba(255,245,225,${0.9 * flash})`);
+      g.addColorStop(0.5, `rgba(255,190,110,${0.4 * flash})`);
+      g.addColorStop(1, 'rgba(255,150,60,0)');
+      ov.fillStyle = g; ov.fillRect(0, 0, W, H);
+    }
+    const rayP = ease((ft - 1.0) / 1.2);
+    if (rayP > 0) {
+      const L = universe.d * rayP;
+      const pt = project([universe.dir[0] * L, universe.dir[1] * L, universe.dir[2] * L]);
+      if (pt) {
+        ov.save();
+        const glow = 0.75 + 0.25 * Math.sin(S.time * 3);
+        ov.shadowColor = '#ffd27f'; ov.shadowBlur = 22 * glow;
+        const g = ov.createLinearGradient(pSun.x, pSun.y, pt.x, pt.y);
+        g.addColorStop(0, 'rgba(255,200,120,0.15)');
+        g.addColorStop(1, `rgba(255,224,160,${0.95 * glow})`);
+        ov.beginPath(); ov.moveTo(pSun.x, pSun.y); ov.lineTo(pt.x, pt.y);
+        ov.strokeStyle = g; ov.lineWidth = 2.6; ov.lineCap = 'round'; ov.stroke();
+        ov.restore();
+      }
+    }
+    const eyeP = ease((ft - 2.0) / 1.4);
+    if (eyeP > 0) drawEyeOv(universe.d, eyeP, ft, false);
+  }
+
+  // ---- 终局：射程之外（瞄准模式下保留已揭示的幽灵宇宙之眼） ----
+  if ((S.phase === 'lost' || (S.phase === 'aim' && S.lostGhost)) && pSun) {
+    const lt = S.lostT;
+    const gp = ease(lt / 1.6);
+    if (gp > 0) {
+      const dR = S.reach, dE = universe.d, dir = universe.dir;
+      const pR = project([dir[0] * dR, dir[1] * dR, dir[2] * dR]);
+      const pE = project([dir[0] * dE, dir[1] * dE, dir[2] * dE]);
+      const pIn = project([dir[0] * dR * gp, dir[1] * dR * gp, dir[2] * dR * gp]);
+      if (pIn) {
+        ov.strokeStyle = `rgba(255,165,77,${0.5 * gp})`;
+        ov.lineWidth = 1.6; ov.lineCap = 'round';
+        ov.beginPath(); ov.moveTo(pSun.x, pSun.y); ov.lineTo(pIn.x, pIn.y); ov.stroke();
+      }
+      if (gp > 0.98 && pR && pE) {
+        ov.save();
+        ov.setLineDash([3, 9]);
+        ov.strokeStyle = 'rgba(176,138,138,0.55)';
+        ov.lineWidth = 1;
+        ov.beginPath(); ov.moveTo(pR.x, pR.y); ov.lineTo(pE.x, pE.y); ov.stroke();
+        ov.setLineDash([]);
+        ov.fillStyle = 'rgba(176,138,138,0.8)';
+        ov.font = '10px Consolas, monospace';
+        ov.textAlign = 'center';
+        ov.fillText('Δ ' + (dE - dR).toFixed(2) + ' R₁₀₀',
+          (pR.x + pE.x) / 2 + 14, (pR.y + pE.y) / 2 - 8);
+        ov.restore();
+      }
+    }
+    const eyeP = ease((lt - 1.4) / 1.4);
+    if (eyeP > 0) drawEyeOv(universe.d, eyeP, lt, true);
+  }
+
+  // ---- 手动瞄准：准星 + 试射 ----
+  if (S.phase === 'aim' && pSun) {
+    const R = S.reach;
+    const pr = project([aimDir[0] * R, aimDir[1] * R, aimDir[2] * R]);
+    if (pr && !(S.aimShot && !S.aimShot.done)) {
+      ov.save();
+      ov.setLineDash([3, 6]);
+      ov.strokeStyle = 'rgba(142,240,208,0.35)';
+      ov.lineWidth = 1;
+      ov.beginPath(); ov.moveTo(pSun.x, pSun.y); ov.lineTo(pr.x, pr.y); ov.stroke();
+      ov.setLineDash([]);
+      ov.strokeStyle = 'rgba(142,240,208,0.9)';
+      ov.beginPath(); ov.arc(pr.x, pr.y, 11, 0, TWO_PI); ov.stroke();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        ov.beginPath();
+        ov.moveTo(pr.x + dx * 6, pr.y + dy * 6);
+        ov.lineTo(pr.x + dx * 15, pr.y + dy * 15);
+        ov.stroke();
+      }
+      ov.fillStyle = 'rgba(142,240,208,0.8)';
+      ov.font = '10px Consolas, monospace';
+      ov.textAlign = 'left';
+      ov.fillText(fmtDir(aimDir), pr.x + 18, pr.y - 12);
+      ov.restore();
+    }
+    if (S.aimShot) {
+      const sh = S.aimShot;
+      const q = Math.min(1, (S.time - sh.t0) / 2.6);
+      const L = R * ease(q);
+      const pt2 = project([sh.dir[0] * L, sh.dir[1] * L, sh.dir[2] * L]);
+      if (pt2) {
+        const g = ov.createLinearGradient(pSun.x, pSun.y, pt2.x, pt2.y);
+        g.addColorStop(0, 'rgba(255,160,80,0)');
+        g.addColorStop(0.6, 'rgba(255,170,90,0.5)');
+        g.addColorStop(1, 'rgba(255,220,170,0.95)');
+        ov.beginPath(); ov.moveTo(pSun.x, pSun.y); ov.lineTo(pt2.x, pt2.y);
+        ov.strokeStyle = g; ov.lineWidth = 2; ov.lineCap = 'round'; ov.stroke();
+        ov.save();
+        ov.shadowColor = '#ffce9e'; ov.shadowBlur = 14;
+        ov.beginPath(); ov.arc(pt2.x, pt2.y, 3.4, 0, TWO_PI);
+        ov.fillStyle = '#fff3e0'; ov.fill();
+        ov.restore();
+        if (sh.done) {
+          const pp2 = (S.time % 2.4) / 2.4;
+          ov.beginPath(); ov.arc(pt2.x, pt2.y, 6 + pp2 * 16, 0, TWO_PI);
+          ov.strokeStyle = `rgba(255,170,90,${0.5 * (1 - pp2)})`;
+          ov.lineWidth = 1; ov.stroke();
+        }
+      }
+    }
+  }
+}
+
+// 行星渲染：受光面朝向太阳的着色球 + 各自的特征细节
+function drawPlanet(pr, rpx, cLight, cDark, id, pSun) {
+  let lx = 0, ly = -0.4;
+  if (pSun) {
+    const dx = pSun.x - pr.x, dy = pSun.y - pr.y;
+    const l = Math.hypot(dx, dy) || 1;
+    lx = dx / l; ly = dy / l;
+  }
+  const g = ov.createRadialGradient(
+    pr.x + lx * rpx * 0.45, pr.y + ly * rpx * 0.45, rpx * 0.1,
+    pr.x, pr.y, rpx);
+  g.addColorStop(0, `rgb(${cLight})`);
+  g.addColorStop(0.72, `rgb(${cDark})`);
+  g.addColorStop(1, `rgba(${cDark},0.35)`);
+  ov.beginPath(); ov.arc(pr.x, pr.y, rpx, 0, TWO_PI);
+  ov.fillStyle = g; ov.fill();
+  if (id === 'gd' && rpx > 4) {           // 深巨星：云带
+    ov.save();
+    ov.beginPath(); ov.arc(pr.x, pr.y, rpx * 0.97, 0, TWO_PI); ov.clip();
+    ov.strokeStyle = 'rgba(230,245,240,0.35)';
+    ov.lineWidth = rpx * 0.16;
+    ov.beginPath();
+    ov.ellipse(pr.x, pr.y, rpx * 0.9, rpx * 0.34, 0.3, 0, TWO_PI);
+    ov.stroke();
+    ov.restore();
+  }
+  if (id === 'bh' && rpx > 4) {           // 碎空星：地壳裂隙间透出的黑洞
+    ov.beginPath(); ov.arc(pr.x, pr.y, rpx * 0.28, 0, TWO_PI);
+    ov.fillStyle = 'rgba(2,4,8,0.9)'; ov.fill();
+  }
+  if (id === 'db' && rpx > 4) {           // 黑棘星：外围雾光
+    const fg = ov.createRadialGradient(pr.x, pr.y, rpx * 0.6, pr.x, pr.y, rpx * 1.8);
+    fg.addColorStop(0, 'rgba(182,199,207,0.16)');
+    fg.addColorStop(1, 'rgba(182,199,207,0)');
+    ov.beginPath(); ov.arc(pr.x, pr.y, rpx * 1.8, 0, TWO_PI);
+    ov.fillStyle = fg; ov.fill();
+  }
+}
+
+// 恒星渲染：光球（临边昏暗）+ 表面暗斑 + 日珥 + 日冕
+// sp ∈ [0,1]：主序 → 红巨星；最后 3% 为坍缩（蓝白化、急剧收缩）
+function lerp(a, b, t) { return a + (b - a) * t; }
+function drawSun(pSun, scale, sp) {
+  const g = ease(sp);
+  const cp = ease(Math.max(0, (sp - 0.97) / 0.03));        // 坍缩进度
+  const swell = 1 + 2.3 * Math.pow(g, 1.6);                // 红巨星膨胀至 ~3.3×
+  const pulse = 1 + 0.045 * Math.sin(S.time * (2.4 + 6 * g));
+  const rPh = 0.055 * scale * swell * (1 - 0.72 * cp) * pulse;
+
+  const mix = (c1, c2, t) => c1.map((v, i) => Math.round(lerp(v, c2[i], t)));
+  let core = mix([255, 246, 230], [255, 214, 170], g);
+  let mid = mix([255, 196, 120], [255, 110, 50], g);
+  let edge = mix([255, 130, 45], [205, 45, 18], g);
+  if (cp > 0) {   // 坍缩：色温骤升为蓝白
+    core = mix(core, [235, 244, 255], cp);
+    mid = mix(mid, [160, 200, 255], cp);
+    edge = mix(edge, [90, 130, 230], cp);
+  }
+
+  // 日冕（先画，在光球之下）
+  const rC = rPh * (4.4 - 1.6 * g) * (1 + 0.6 * cp);
+  const cg = ov.createRadialGradient(pSun.x, pSun.y, rPh * 0.85, pSun.x, pSun.y, rC);
+  cg.addColorStop(0, `rgba(${mid},0.32)`);
+  cg.addColorStop(0.5, `rgba(${edge},0.12)`);
+  cg.addColorStop(1, 'rgba(0,0,0,0)');
+  ov.beginPath(); ov.arc(pSun.x, pSun.y, rC, 0, TWO_PI);
+  ov.fillStyle = cg; ov.fill();
+
+  // 光球：临边昏暗
+  const pg = ov.createRadialGradient(pSun.x, pSun.y, 0, pSun.x, pSun.y, rPh);
+  pg.addColorStop(0, `rgb(${core})`);
+  pg.addColorStop(0.55, `rgb(${mid})`);
+  pg.addColorStop(0.88, `rgb(${edge})`);
+  pg.addColorStop(1, `rgba(${edge},0.25)`);
+  ov.beginPath(); ov.arc(pSun.x, pSun.y, rPh, 0, TWO_PI);
+  ov.fillStyle = pg; ov.fill();
+
+  // 表面不均匀：两片缓慢游移的暗斑（用光球圆域裁剪）
+  ov.save();
+  ov.beginPath(); ov.arc(pSun.x, pSun.y, rPh * 0.98, 0, TWO_PI); ov.clip();
+  ov.globalAlpha = 0.18 * (1 - cp);
+  for (let k = 0; k < 2; k++) {
+    const a = S.time * (0.07 + k * 0.045) + k * 2.6;
+    const ox = pSun.x + Math.cos(a) * rPh * 0.42;
+    const oy = pSun.y + Math.sin(a * 0.83) * rPh * 0.36;
+    const sg = ov.createRadialGradient(ox, oy, 0, ox, oy, rPh * 0.5);
+    sg.addColorStop(0, 'rgba(110,25,8,0.95)');
+    sg.addColorStop(1, 'rgba(110,25,8,0)');
+    ov.fillStyle = sg;
+    ov.fillRect(pSun.x - rPh, pSun.y - rPh, rPh * 2, rPh * 2);
+  }
+  ov.restore();
+
+  // 日珥：贴着边缘游走的弧
+  ov.save();
+  ov.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    const a = S.time * 0.04 + k * 2.09;
+    const span = 0.35 + 0.1 * Math.sin(S.time * 0.6 + k);
+    ov.beginPath();
+    ov.arc(pSun.x, pSun.y,
+      rPh * (1.045 + 0.025 * Math.sin(S.time * 0.9 + k * 2)), a, a + span);
+    ov.strokeStyle = `rgba(255,${Math.round(140 - 60 * g)},60,${0.38 * (1 - cp)})`;
+    ov.lineWidth = 1.6;
+    ov.stroke();
+  }
+  ov.restore();
+}
+
+// 宇宙之眼（覆盖层，随 3D 投影缩放）
+function drawEyeOv(dist, eyeP, t, ghost) {
+  const dir = universe.dir;
+  const pe = project([dir[0] * dist, dir[1] * dist, dir[2] * dist]);
+  if (!pe) return;
+  const scale = Fpx / pe.w;
+  const R0 = 0.075 * scale * eyeP * (1 + 0.05 * Math.sin(S.time * 1.7));
+  let g = ov.createRadialGradient(pe.x, pe.y, 0, pe.x, pe.y, R0 * 2.4);
+  if (ghost) {
+    g.addColorStop(0, `rgba(150,130,160,${0.30 * eyeP})`);
+    g.addColorStop(0.5, `rgba(110,95,125,${0.11 * eyeP})`);
+    g.addColorStop(1, 'rgba(60,50,80,0)');
+  } else {
+    g.addColorStop(0, `rgba(142,240,208,${0.5 * eyeP})`);
+    g.addColorStop(0.5, `rgba(90,190,170,${0.18 * eyeP})`);
+    g.addColorStop(1, 'rgba(40,120,110,0)');
+  }
+  ov.beginPath(); ov.arc(pe.x, pe.y, R0 * 2.4, 0, TWO_PI);
+  ov.fillStyle = g; ov.fill();
+  ov.beginPath(); ov.arc(pe.x, pe.y, R0 * 0.55, 0, TWO_PI);
+  ov.fillStyle = `rgba(6,10,18,${0.9 * eyeP})`; ov.fill();
+  ov.beginPath(); ov.arc(pe.x, pe.y, R0 * 0.55, 0, TWO_PI);
+  ov.strokeStyle = ghost
+    ? `rgba(190,170,200,${0.6 * eyeP})`
+    : `rgba(180,255,230,${0.85 * eyeP})`;
+  ov.lineWidth = 1.4; ov.stroke();
+  if (!ghost) {
+    for (let k = 0; k < 3; k++) {
+      const rp = (t - 2.0 - k * 0.35) / 1.6;
+      if (rp > 0 && rp < 1) {
+        ov.beginPath(); ov.arc(pe.x, pe.y, R0 * 0.6 + rp * 2.2 * R0, 0, TWO_PI);
+        ov.strokeStyle = `rgba(142,240,208,${0.4 * (1 - rp)})`;
+        ov.lineWidth = 1; ov.stroke();
+      }
+    }
+  }
+}
+
+// ---------- 交互：旋转 / 缩放 ----------
+let dragging = false, lastX = 0, lastY = 0, lastInteract = 0;
+let dragMoved = 0;
+let lastMouse = null;
+let aimDir = [1, 0, 0];
+glc.addEventListener('pointerdown', e => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  dragMoved = 0;
+  lastInteract = performance.now();
+  glc.classList.add('grabbing');
+  glc.setPointerCapture(e.pointerId);
+});
+glc.addEventListener('pointermove', e => {
+  lastMouse = { x: e.clientX, y: e.clientY };
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  dragMoved += Math.abs(dx) + Math.abs(dy);
+  cam.yaw -= dx * 0.005;
+  cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch + dy * 0.005));
+  cam.vyaw = -dx * 0.005 * 60; cam.vpitch = dy * 0.005 * 60;
+  lastInteract = performance.now();
+});
+window.addEventListener('pointerup', e => {
+  const wasDragging = dragging;
+  dragging = false;
+  glc.classList.remove('grabbing');
+  // 瞄准模式：原地单击（位移 < 6px）= 发射一枚试射
+  if (wasDragging && S && S.phase === 'aim' && dragMoved < 6
+      && !(S.aimShot && !S.aimShot.done)) {
+    lastMouse = { x: e.clientX, y: e.clientY };
+    aimDir = screenToDir(e.clientX, e.clientY, S.reach);
+    S.aimShot = { dir: aimDir.slice(), t0: S.time, done: false };
+    S.aimResult = null;
+    AudioSys.whoosh();
+    setStatus('试射 #' + (S.aimShots + 1) + ' · 探测器已发射 · 沿你指定的方向飞行 22 分钟…');
+  }
+});
+glc.addEventListener('wheel', e => {
+  e.preventDefault();
+  cam.dist = Math.max(0.45, Math.min(14, cam.dist * Math.exp(e.deltaY * 0.001)));
+  lastInteract = performance.now();
+}, { passive: false });
+
+function cameraIdle(dt) {
+  if (dragging) return;
+  // 惯性
+  if (Math.abs(cam.vyaw) > 0.001 || Math.abs(cam.vpitch) > 0.001) {
+    cam.yaw += cam.vyaw * dt;
+    cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch + cam.vpitch * dt));
+    cam.vyaw *= Math.pow(0.02, dt); cam.vpitch *= Math.pow(0.02, dt);
+  }
+  // 闲置自转（瞄准模式下禁用，避免视角漂移带偏准星）
+  if (S && S.phase !== 'aim' && performance.now() - lastInteract > 4000)
+    cam.yaw += dt * 0.07;
+}
+
+// ---------- 分析图表（SVG，与 v2 相同的模型） ----------
+const CHART = { w: 600, h: 280, ml: 46, mr: 16, mt: 26, mb: 34, pmin: 25, pmax: 320 };
+function cx2(p) { const c = CHART; return c.ml + (p - c.pmin) / (c.pmax - c.pmin) * (c.w - c.ml - c.mr); }
+function cy2(v) { const c = CHART; return c.mt + (1 - v / 100) * (c.h - c.mt - c.mb); }
+
+function buildChart() {
+  const c = CHART;
+  let pts = [];
+  for (let p = c.pmin; p <= c.pmax; p += 2.5)
+    pts.push([cx2(p), cy2(pReach(p) * 100)]);
+  const path = pts.map((pt, i) => (i ? 'L' : 'M') + pt[0].toFixed(1) + ' ' + pt[1].toFixed(1)).join('');
+  const area = path + `L${cx2(c.pmax).toFixed(1)} ${cy2(0)}L${cx2(c.pmin).toFixed(1)} ${cy2(0)}Z`;
+
+  let marks = '';
+  function vline(p, color, label, anchor) {
+    const x = cx2(p);
+    marks += `<line x1="${x}" y1="${c.mt - 4}" x2="${x}" y2="${cy2(0)}"
+      stroke="${color}" stroke-width="1" stroke-dasharray="3 5" opacity=".8"/>
+      <text x="${x + (anchor === 'end' ? -5 : 5)}" y="${c.mt + 6}" fill="${color}"
+      font-size="10" text-anchor="${anchor}" font-family="inherit">${label}</text>
+      <circle cx="${x}" cy="${cy2(pReach(p) * 100)}" r="3.4" fill="${color}"/>
+      <text x="${x + (anchor === 'end' ? -8 : 8)}" y="${cy2(pReach(p) * 100) - 8}"
+      fill="${color}" font-size="10.5" text-anchor="${anchor}"
+      font-family="Consolas,monospace">${(pReach(p) * 100).toFixed(1)}%</text>`;
+  }
+  vline(100, '#9a8f80', '亚罗上限 100%', 'start');
+  vline(300, '#e8873a', '马洛&艾文斯 300%', 'end');
+  if (S && S.revealed) {
+    const pq = reqPower(universe.d);
+    if (pq <= c.pmax) {
+      const x = cx2(Math.max(c.pmin, pq));
+      marks += `<line x1="${x}" y1="${c.mt + 14}" x2="${x}" y2="${cy2(0)}"
+        stroke="#45c99c" stroke-width="1.2" opacity=".9"/>
+        <text x="${x + 5}" y="${c.mt + 24}" fill="#45c99c" font-size="10"
+        font-family="inherit">本宇宙需 ≥${Math.ceil(pq)}%</text>`;
+    } else {
+      marks += `<text x="${cx2(c.pmax)}" y="${c.mt + 24}" fill="#45c99c" font-size="10"
+        text-anchor="end" font-family="inherit">本宇宙需 ≥${Math.ceil(reqPower(universe.d))}% · 超出图示范围</text>`;
+    }
+  }
+
+  let grid = '';
+  for (const v of [0, 25, 50, 75, 100]) {
+    grid += `<line x1="${c.ml}" y1="${cy2(v)}" x2="${c.w - c.mr}" y2="${cy2(v)}"
+      stroke="rgba(232,222,208,.08)" stroke-width="1"/>
+      <text x="${c.ml - 8}" y="${cy2(v) + 3.5}" fill="#9a8f80" font-size="10"
+      text-anchor="end" font-family="Consolas,monospace">${v}%</text>`;
+  }
+  let xticks = '';
+  for (const p of [50, 100, 150, 200, 250, 300]) {
+    xticks += `<text x="${cx2(p)}" y="${cy2(0) + 16}" fill="#9a8f80" font-size="10"
+      text-anchor="middle" font-family="Consolas,monospace">${p}%</text>`;
+  }
+
+  document.getElementById('chartWrap').innerHTML =
+    `<svg id="chartSvg" viewBox="0 0 ${c.w} ${c.h}" style="width:100%;display:block">
+      <text x="${c.ml}" y="12" fill="#e8ded0" font-size="11" letter-spacing="2"
+        font-family="inherit">宇宙之眼落在射程内的概率</text>
+      <text x="${c.w - c.mr}" y="${c.h - 2}" fill="#9a8f80" font-size="10"
+        text-anchor="end" font-family="inherit">轨道炮功率 →</text>
+      ${grid}${xticks}
+      <path d="${area}" fill="rgba(232,135,58,.09)"/>
+      <path d="${path}" fill="none" stroke="#e8873a" stroke-width="2"
+        stroke-linecap="round"/>
+      ${marks}
+      <line id="chartCross" x1="0" y1="${c.mt}" x2="0" y2="${cy2(0)}"
+        stroke="rgba(232,222,208,.35)" stroke-width="1" style="display:none"/>
+      <circle id="chartDot" r="3.5" fill="#e8873a" stroke="#04060d"
+        stroke-width="2" style="display:none"/>
+      <rect x="${c.ml}" y="${c.mt}" width="${c.w - c.ml - c.mr}"
+        height="${cy2(0) - c.mt}" fill="transparent" id="chartHit"/>
+    </svg>`;
+
+  const svg = document.getElementById('chartSvg');
+  const hit = document.getElementById('chartHit');
+  const cross = document.getElementById('chartCross');
+  const dot = document.getElementById('chartDot');
+  const tip = document.getElementById('chartTip');
+  hit.addEventListener('mousemove', e => {
+    const box = svg.getBoundingClientRect();
+    const scale = c.w / box.width;
+    const sx = (e.clientX - box.left) * scale;
+    const p = c.pmin + (sx - c.ml) / (c.w - c.ml - c.mr) * (c.pmax - c.pmin);
+    const pc = Math.max(c.pmin, Math.min(c.pmax, p));
+    const x = cx2(pc), y = cy2(pReach(pc) * 100);
+    cross.style.display = ''; cross.setAttribute('x1', x); cross.setAttribute('x2', x);
+    dot.style.display = ''; dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+    tip.style.display = 'block';
+    tip.innerHTML = '功率 ' + pc.toFixed(0) + '%<br>射程 ' + reachOf(pc).toFixed(2)
+      + ' R₁₀₀<br>命中概率 ' + (pReach(pc) * 100).toFixed(1) + '%';
+    const wrap = document.getElementById('chartWrap').getBoundingClientRect();
+    let tx = e.clientX - wrap.left + 14, ty = e.clientY - wrap.top - 10;
+    if (tx > wrap.width - 150) tx -= 170;
+    tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
+  });
+  hit.addEventListener('mouseleave', () => {
+    cross.style.display = 'none'; dot.style.display = 'none';
+    tip.style.display = 'none';
+  });
+
+  const body = document.getElementById('anaBody');
+  body.innerHTML = POWERS.map(o => {
+    const pr = pReach(o.p), risk = 1 - pr;
+    return `<tr${o.p === POWER ? ' class="hl"' : ''}>
+      <td>${o.p}% · ${o.name}</td>
+      <td>${reachOf(o.p).toFixed(2)}</td>
+      <td>${(pr * 100).toFixed(1)}%</td>
+      <td>${(risk * 100).toFixed(1)}%<span class="riskbar"
+        style="width:${Math.round(risk * 70)}px"></span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------- 音效（WebAudio 全程序化合成，无外部音频文件） ----------
+const AudioSys = {
+  ctx: null, master: null, droneGain: null, on: false, _nb: null,
+  ensure() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0;
+    this.master.connect(this.ctx.destination);
+    this.startDrone();
+    this.tryLocalBGM();
+  },
+  toggle() {
+    this.ensure();
+    this.on = !this.on;
+    this.ctx.resume();
+    this.master.gain.linearRampToValueAtTime(
+      this.on ? 0.6 : 0, this.ctx.currentTime + 0.8);
+    return this.on;
+  },
+  startDrone() {   // 深空底噪：低频正弦簇 + 缓慢呼吸
+    const c = this.ctx;
+    this.droneGain = c.createGain();
+    this.droneGain.gain.value = 0.05;
+    this.droneGain.connect(this.master);
+    for (const [f, g] of [[55, 1], [55.4, 0.8], [110.3, 0.25], [164.8, 0.1]]) {
+      const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const og = c.createGain(); og.gain.value = g * 0.9;
+      o.connect(og); og.connect(this.droneGain); o.start();
+    }
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.05;
+    const lg = c.createGain(); lg.gain.value = 0.018;
+    lfo.connect(lg); lg.connect(this.droneGain.gain); lfo.start();
+  },
+  noiseBuf() {
+    if (this._nb) return this._nb;
+    const c = this.ctx, b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return this._nb = b;
+  },
+  blast(dur, f0, f1, peak) {   // 扫频噪声包络：发射 / 超新星共用
+    if (!this.on) return;
+    const c = this.ctx, t = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = this.noiseBuf(); src.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(f0, t);
+    bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + dur * 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(t); src.stop(t + dur + 0.1);
+  },
+  whoosh() { this.blast(1.4, 260, 2400, 0.22); },
+  nova() {
+    this.blast(4.5, 420, 45, 0.5);
+    if (!this.on) return;
+    const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 2.5);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.45, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);
+    o.connect(g); g.connect(this.master);
+    o.start(t); o.stop(t + 2.6);
+  },
+  note(f, t0, dur, vol, type) {
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type = type || 'sine'; o.frequency.value = f;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  found() {   // 信号确认：原创上行琶音钟声
+    if (!this.on) return;
+    const t = this.ctx.currentTime;
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+      this.note(f, t + 0.5 + i * 0.45, 2.4, 0.15, 'sine');
+      this.note(f * 2, t + 0.5 + i * 0.45, 1.2, 0.035, 'triangle');
+    });
+  },
+  ping() {   // 异常读数声纳
+    if (!this.on) return;
+    const t = this.ctx.currentTime;
+    this.note(660, t, 1.6, 0.13); this.note(495, t + 0.25, 1.8, 0.07);
+  },
+  lost() {   // 永续循环：低音小二度暗涌
+    if (!this.on) return;
+    const t = this.ctx.currentTime;
+    this.note(110, t, 6, 0.15); this.note(116.5, t + 0.15, 6, 0.09);
+  },
+  async tryLocalBGM() {
+    // 本地彩蛋：同目录放置自备的 bgm.mp3（如官方原声带）则循环播放。
+    // Artifact 沙箱中该请求静默失败，回落到合成底噪。
+    try {
+      const r = await fetch('bgm.mp3');
+      if (!r.ok) return;
+      const buf = await this.ctx.decodeAudioData(await r.arrayBuffer());
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const g = this.ctx.createGain(); g.gain.value = 0.35;
+      src.connect(g); g.connect(this.master); src.start();
+      this.droneGain.gain.value = 0.012;
+    } catch (e) { /* 无本地 BGM */ }
+  },
+};
+
+// ---------- 实时模式存档（壁纸挂机断电续传） ----------
+const SAVE_KEY = 'atp-realtime-v1';
+let saveAccum = 0;
+function saveState() {
+  if (!REALTIME || !S || S.phase === 'found') return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      d: universe.d, dir: universe.dir, sg: universe.stranger.dir,
+      power: POWER, attempts: S.attempts,
+      sh: S.strangerHits, sf: S.strangerFirst,
+      ts: Date.now(),
+    }));
+  } catch (e) {}
+}
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+function tryRestore() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
+  if (!s || !s.dir || !s.sg) return false;
+  newUniverse();
+  universe.d = s.d; universe.dir = s.dir; universe.stranger.dir = s.sg;
+  POWER = s.power || 100;
+  const sl = document.getElementById('powerSlider');
+  sl.value = POWER; updateReadout();
+  REALTIME = true;
+  initSim();
+  S.phase = 'slow';   // 挂机恢复不需要再按开始
+  S.attempts = s.attempts || 0;
+  S.strangerHits = s.sh || 0;
+  S.strangerFirst = s.sf || 0;
+  // 用等价均匀样本补齐历史轨迹（方向本就均匀分布，统计上无差别）
+  const rr = mulberry32((Math.random() * 2 ** 31) | 0);
+  sampStride = 1;
+  while (S.attempts / sampStride > SAMP_CAP * 0.8) sampStride *= 2;
+  const n = Math.floor(S.attempts / sampStride);
+  for (let i = 0; i < n; i++) {
+    const at = attemptFrom(rr);
+    sampAdd(at);
+    if (i < 4000) cloudAdd(at.dir, S.reach * at.jit);
+  }
+  setRealtimeUI(true);
+  // 离线补账：把关页期间流逝的真实时间折算成循环
+  let offline = 0;
+  if (s.ts) offline = catchUp((Date.now() - s.ts) / 1000);
+  if (offline > 0 && S.phase === 'slow')
+    setStatus('离线挂机 · 补记 ' + fmtInt(offline) + ' 个循环 · 从第 '
+      + fmtInt(S.attempts) + ' 次继续');
+  else if (S.phase === 'slow')
+    setStatus('实时搜索已恢复 · 从第 ' + fmtInt(S.attempts) + ' 次循环继续');
+  return true;
+}
+// 后台/离线补账：真实时钟结算错过的循环
+// 返回本次补记的已完成循环数；当前进行中的循环由下一帧正常发射
+function catchUp(seconds) {
+  if (!REALTIME || !S || S.phase !== 'slow' || seconds < 2) return 0;
+  const total = S.slowT + seconds;
+  const boundaries = Math.floor(total / REAL_DUR);   // 越过的循环边界数
+  const rem = total % REAL_DUR;
+  if (boundaries === 0) {          // 仍在同一循环内：只推进进度
+    S.slowT = rem;
+    return 0;
+  }
+  // 已完整结束的后续循环各补发一次（最后一个进行中的循环留给 update 发射）
+  let done = 0;
+  for (; done < boundaries - 1; done++) {
+    const at = fireOne();
+    cloudAdd(at.dir, S.reach * at.jit);
+    if (S.phase !== 'slow') return done + 1;   // 补账期间竟然找到了
+  }
+  S.slowT = rem;
+  S.slowLaunch = null;
+  S.slowIndex = 0;
+  reviveStars();
+  saveState();
+  return boundaries;
+}
+let hiddenAt = 0;
+window.addEventListener('beforeunload', saveState);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    saveState();
+  } else if (hiddenAt) {
+    const gap = (Date.now() - hiddenAt) / 1000;
+    hiddenAt = 0;
+    const n = catchUp(gap);
+    if (n > 0)
+      setStatus('后台挂机 · 补记 ' + fmtInt(n) + ' 个循环 · 已累计第 '
+        + fmtInt(S.attempts) + ' 次');
+  }
+});
+
+// ---------- 主循环 ----------
+let lastTs = performance.now();
+let lastUi = performance.now();
+let zenFrame = 0;
+window.__renderStats = { total: 0, drawn: 0 };
+for (const ev of ['pointermove', 'pointerdown', 'wheel', 'keydown'])
+  window.addEventListener(ev, () => {
+    lastUi = performance.now();
+    document.body.classList.remove('zen');
+  });
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  // 视口尺寸变化有时不触发 resize 事件（壁纸容器/面板恢复前台），主动校验
+  if (W !== Math.max(1, window.innerWidth) || H !== Math.max(1, window.innerHeight)) resize();
+  cameraIdle(dt);
+  if (!S.paused) update(dt);
+  // 省电节流：纯净壁纸视图下渲染降到 1/3 帧率（约 20fps）
+  // 模拟逻辑仍每帧推进，只跳过绘制；22 分钟节奏下视觉无感
+  zenFrame++;
+  const zen = document.body.classList.contains('zen');
+  window.__renderStats.total++;
+  if (!zen || zenFrame % 3 === 0) {
+    draw();
+    window.__renderStats.drawn++;
+  }
+  // 实时模式运行中：15 秒无操作进入纯净壁纸视图；每 20 秒自动存档
+  if (REALTIME && S.phase === 'slow') {
+    if (performance.now() - lastUi > 15000) document.body.classList.add('zen');
+    saveAccum += dt;
+    if (saveAccum > 20) { saveAccum = 0; saveState(); }
+  }
+  syncButtons();
+  requestAnimationFrame(frame);
+}
+
+// ---------- 控件 ----------
+const slider = document.getElementById('powerSlider');
+function updateReadout() {
+  const r = reachOf(POWER);
+  document.getElementById('powerReadout').textContent =
+    POWER + '% → 射程 ' + r.toFixed(2) + ' R₁₀₀ · 探测器 '
+    + (r * R100_KM / (LOOP_MIN * 60)).toFixed(1) + ' km/s';
+}
+slider.addEventListener('input', () => {
+  POWER = +slider.value;
+  updateReadout();
+});
+slider.addEventListener('change', () => {
+  POWER = +slider.value;
+  updateReadout();
+  initSim();    // 保留同一宇宙
+});
+for (const b of document.querySelectorAll('#presets button')) {
+  b.addEventListener('click', () => {
+    slider.value = b.dataset.p;
+    POWER = +b.dataset.p;
+    updateReadout();
+    initSim();
+  });
+}
+
+// ---------- 开始 / 手动瞄准 ----------
+function syncButtons() {
+  document.getElementById('btnStart').style.display =
+    (S.phase === 'standby' || S.phase === 'aim') ? '' : 'none';
+  document.getElementById('btnAim').textContent =
+    S.phase === 'aim' ? '✕ 退出瞄准' : '🎯 手动瞄准';
+}
+function startRun() {
+  if (S.phase !== 'standby' && S.phase !== 'aim') return;
+  S.phase = 'slow';
+  S.slowT = 0; S.slowIndex = 0; S.slowLaunch = null;
+  S.aimShot = null; S.aimResult = null;
+  S.aps = 2;
+  setStatus(REALTIME
+    ? '实时循环开始 · 每循环真实 22:00 · 无操作 15 秒进入壁纸视图'
+    : '首个循环开始 · 演示 3 个完整循环后自动加速');
+  if (REALTIME) saveState();
+}
+function enterAim() {
+  if (S.phase === 'found' || S.phase === 'aim') return;
+  S.phase = 'aim';
+  S.slowLaunch = null;
+  S.recent = [];
+  S.aimShot = null;
+  S.aimResult = null;
+  document.body.classList.remove('zen');
+  const panel = document.getElementById('panel');
+  panel.classList.remove('show');
+  document.getElementById('panelShow').style.display = 'none';
+  setStatus('手动瞄准 · 拖动旋转视角 · 在射程球面上单击发射');
+}
+document.getElementById('btnStart').addEventListener('click', startRun);
+document.getElementById('btnAim').addEventListener('click', () => {
+  if (S.phase === 'aim') {
+    S.phase = 'standby';
+    S.aimShot = null;
+    setStatus('已退出瞄准 · 装置待命 · 点击「▶ 开始模拟」交给穷举');
+  } else {
+    enterAim();
+  }
+});
+
+document.getElementById('btnBoost').addEventListener('click', () => {
+  if (REALTIME) setRealtime(false);   // 加速即退出实时挂机
+  if (S.phase === 'slow' || S.phase === 'standby' || S.phase === 'aim') {
+    S.phase = 'ramp'; S.slowLaunch = null; S.aimShot = null;
+    reviveStars();
+    setStatus('时间加速协议已启动 · 高速模拟中');
+  }
+  S.aps = 12000;
+});
+document.getElementById('btnPause').addEventListener('click', function () {
+  S.paused = !S.paused;
+  this.textContent = S.paused ? '▶ 继续' : '⏸ 暂停';
+});
+
+// ---------- 实时模式 / 音效开关 ----------
+function setRealtimeUI(on) {
+  document.getElementById('btnReal').textContent =
+    on ? '🕰 实时模式 · 开' : '🕰 实时模式';
+  document.getElementById('btnBoost').textContent =
+    on ? '⏩ 退出实时并加速' : '⏩ 启动时间加速';
+}
+function setRealtime(on) {
+  REALTIME = on;
+  setRealtimeUI(on);
+  document.body.classList.remove('zen');
+  if (on) {
+    if (S.phase === 'slow') {        // 运行中切换：当前宇宙改为实时节奏
+      S.slowT = 0; S.slowIndex = 0; S.slowLaunch = null;
+      setStatus('实时模式 · 每循环真实 22:00 · 无操作 15 秒进入壁纸视图');
+      saveState();
+    } else if (S.phase === 'ramp' || S.phase === 'found' || S.phase === 'lost') {
+      initSim();                     // 以同一宇宙回到待命
+      setStatus('实时模式待命 · 点击「▶ 开始模拟」');
+    } else {
+      setStatus('实时模式待命 · 点击「▶ 开始模拟」');
+    }
+  } else {
+    clearSave();
+  }
+}
+document.getElementById('btnReal').addEventListener('click', () => setRealtime(!REALTIME));
+document.getElementById('btnAudio').addEventListener('click', function () {
+  const on = AudioSys.toggle();
+  this.textContent = on ? '🔊 音效 · 开' : '🔇 音效';
+});
+
+function restartNewUniverse() {
+  clearSave();
+  newUniverse();
+  initSim();   // 回到待命，由「▶ 开始模拟」启动
+}
+document.getElementById('btnRestart').addEventListener('click', restartNewUniverse);
+document.getElementById('btnAgain').addEventListener('click', restartNewUniverse);
+document.getElementById('btnLostNew').addEventListener('click', restartNewUniverse);
+document.getElementById('panelClose').addEventListener('click', () => {
+  document.getElementById('panel').classList.remove('show');
+  document.getElementById('panelShow').style.display = 'block';
+});
+document.getElementById('panelShow').addEventListener('click', function () {
+  document.getElementById('panel').classList.add('show');
+  this.style.display = 'none';
+});
+document.getElementById('btnAnalysis').addEventListener('click', () => {
+  buildChart();
+  document.getElementById('analysis').classList.add('show');
+});
+document.getElementById('anaClose').addEventListener('click', () => {
+  document.getElementById('analysis').classList.remove('show');
+});
+document.getElementById('analysis').addEventListener('click', e => {
+  if (e.target === document.getElementById('analysis'))
+    document.getElementById('analysis').classList.remove('show');
+});
+
+// ---------- 启动 ----------
+buildStars();
+buildOrbits();
+if (!tryRestore()) {
+  newUniverse();
+  updateReadout();
+  initSim();
+}
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
