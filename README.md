@@ -1,19 +1,21 @@
 # Outer Wilds ATP
 
+<p align="center"><b>English</b> | <a href="README.zh-CN.md">简体中文</a></p>
+
 <div align="center">
 
-# ⚠️ 剧 透 警 告 ⚠️
+# ⚠️ S P O I L E R   W A R N I N G ⚠️
 
-# 本页包含《星际拓荒》本体与 DLC 的核心剧透
+# This page contains major spoilers for Outer Wilds and its DLC
 
-### 还没通关？现在就关掉这一页。
+### Haven't finished the game? Close this page. Now.
 
-**这个项目的存在本身就是剧透。**
+**The existence of this project is itself a spoiler.**
 
-下面每一行字，都会毁掉一个你本该自己撞见的瞬间。
-那些瞬间只有一次，没有存档可以读回来。
+Every line below takes away a moment you were meant to find on your own.
+Those moments happen once. There is no save file that gives them back.
 
-**去玩，通关了再回来。我们在这儿等你。**
+**Go play it. Come back when you're done. We'll be here.**
 
 <br>
 
@@ -22,82 +24,89 @@
 ---
 
 <details>
-<summary><b>✅ 我已经通关本体和《眼之谜》，展开全部内容</b></summary>
+<summary><b>✅ I've finished the base game and Echoes of the Eye — show everything</b></summary>
 
 <br>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="运行演示" width="900">
+  <img src="docs/demo.gif" alt="demo" width="900">
 </p>
 
-<p align="center"><sub>时间加速下的穷举过程 · 3 倍速录制</sub></p>
+<p align="center"><sub>Brute-force search under time acceleration · recorded at 3× speed</sub></p>
 
 > Orbital Probe Cannon · Ash Twin Project Simulator
-> 一个《星际拓荒》(Outer Wilds) 同人模拟器。
+> A fan-made *Outer Wilds* simulator.
 
-单文件、零依赖、纯 WebGL。打开就能跑，也能挂着当动态壁纸。
+Single file, zero dependencies, pure WebGL. Open it and it runs. Leave it running as a live wallpaper.
 
-## 这是什么
+## What this is
 
-游戏正史里，挪麦人的轨道探测炮发射了 **9,318,054 次**才击中宇宙之眼。
-这个模拟器把那件事复刻成一个可以真正跑起来的过程：随机方向、有限射程、
-一次次发射，直到某一次撞上那个坐标——然后给你一组挪麦跃迁坐标。
+In canon, the Nomai's Orbital Probe Cannon fired **9,318,054 times** before it hit the
+Eye of the Universe. This simulator turns that into something you can actually watch:
+random directions, finite range, shot after shot, until one of them lands on those
+coordinates — and then it hands you a set of Nomai warp coordinates.
 
-每次「新宇宙」都会重新随机宇宙之眼的位置，所以你的运气和挪麦人的不一样。
+Every "new universe" re-randomizes where the Eye is, so your luck won't be the Nomai's.
 
-## 模拟了什么
+## What's modeled
 
-- **物理模型**：射程 ∝ √功率；宇宙之眼距离服从截断对数正态先验，内边界取
-  世代望远镜巡天与信号无视差排除，外边界取恒星引力束缚极限
-- **正史对照**：以 9,318,054 次为基准反推期望循环数；正史宇宙 d ≈ 1.35 R₁₀₀
-  需要 ≥183% 功率，这也解释了马洛与艾文斯为何必须超载
-- **功率之争**：滑钮两端就是「亚罗安全上限」与「马洛 & 艾文斯」
-- **量子卫月**：未被观测时在六个位置间迁移；观测判定会计算是否被太阳、
-  五颗行星、闯入者或陌生人号的斗篷遮挡
-- **意外发现**：探测器在寻找途中会撞见陌生人号——光学迷彩挡得住望远镜，
-  挡不住动能撞击。结算面板会告诉你它是第几次被撞见的
-- **濒死宇宙**：循环推进时，远方恒星逐颗超新星
-- **跃迁坐标**：结算给出经度 / 纬度 / 距离三枚挪麦字形。六点一笔连线，
-  每枚 975 种，三枚共约 9.27 亿组合，对应精度经 0.37°、纬 0.18°、距 44 km
+- **Physics** — range ∝ √power. The Eye's distance follows a truncated log-normal prior:
+  inner bound from generational telescope surveys plus the absence of signal parallax,
+  outer bound from the star's gravitational binding limit
+- **Canon calibration** — the expected loop count is back-derived from the 9,318,054 figure.
+  The canon universe sits at d ≈ 1.35 R₁₀₀, which requires ≥183% power — which is exactly
+  why Mallow and Avens had to overload the cannon
+- **The power argument** — the two ends of the slider are Yarrow's safety limit and Mallow & Avens
+- **The Quantum Moon** — relocates among six positions while unobserved; the observation
+  check accounts for occlusion by the sun, the five planets, the Interloper, and the
+  Stranger's cloak
+- **Unintended discovery** — probes run into the Stranger on their way out. Optical
+  camouflage stops telescopes, not kinetic impacts. The summary reports which shot first found it
+- **A dying universe** — distant stars go supernova one by one as the loops pile up
+- **Warp coordinates** — the summary yields three Nomai glyphs: longitude, latitude, distance.
+  Six points, one unbroken stroke, 975 glyphs each, ~927 million combinations, resolving to
+  0.37° / 0.18° / 44 km
 
-## 怎么用
+## How to use
 
-直接用浏览器打开 `index.html` 即可（需支持 WebGL）。
+Open `index.html` in any browser with WebGL support.
 
-| 操作 | 说明 |
+| Control | What it does |
 |---|---|
-| 拖动 / 滚轮 | 旋转、缩放视角 |
-| ⏩ 时间加速 | 自动穷举，几秒钟跑完几百万次发射 |
-| 🎯 手动瞄准 | 单击球面自己打一发 |
-| 🕰 实时模式 | 按真实 22 分钟一循环推进，可挂机、自动存档 |
-| 📊 功率分析 | 查看功率与命中概率的关系 |
-| ↻ 新宇宙 | 重新随机宇宙之眼位置 |
+| Drag / scroll | Rotate and zoom the view |
+| ⏩ Time acceleration | Automatic brute force — millions of shots in seconds |
+| 🎯 Manual aim | Click the range sphere to fire one yourself |
+| 🕰 Real-time mode | Advances at one real 22-minute loop per loop; idles and autosaves |
+| 📊 Power analysis | Relationship between power and hit probability |
+| ↻ New universe | Re-randomize the Eye's position |
 
-**当动态壁纸**：实时模式下无操作会隐去全部界面，配合 Lively Wallpaper
-之类的工具即可作为桌面壁纸长期挂机，断电续传。
+**As a live wallpaper:** in real-time mode the entire UI fades out when idle. Pair it with
+something like Lively Wallpaper and leave it running; progress survives a reboot.
 
-**可选 BGM**：把你自己的 `bgm.mp3` 放在同目录即可循环播放（例如官方原声带）。
-出于版权考虑，本仓库不包含任何音频文件；没有该文件时会回落到合成底噪。
+**Optional BGM:** drop your own `bgm.mp3` next to `index.html` and it loops (the official
+soundtrack, for instance). No audio ships with this repository for copyright reasons; without
+that file the simulator falls back to a synthesized drone.
 
-## 实现说明
+## Implementation notes
 
-- 单个 `index.html`，约 2400 行，无任何外部依赖与网络请求
-- WebGL 渲染星空、轨道参考线、行星系与百万级轨迹云
-- 可复现随机数（mulberry32），每次发射固定消耗 3 个随机数，
-  因此终局可以重放全部历史轨迹
-- 百万级发射无法逐条保存，轨迹缓冲满时隔条抽稀、步长翻倍，
-  始终保持对全历史的均匀抽样
+- A single `index.html`, ~2400 lines, with no external dependencies and no network requests
+- WebGL renders the starfield, orbital reference rings, the planetary system, and a
+  trajectory cloud of millions of shots
+- Reproducible RNG (mulberry32); every shot consumes exactly 3 random numbers, so the
+  endgame can replay the entire history of trajectories
+- Millions of shots can't be stored individually — when the trajectory buffer fills, it
+  drops every other sample and doubles the stride, staying a uniform sample of all history
 
 ---
 
-*「我们并没有失去这 22 分钟 —— 它们从未发生过。但答案，确实留了下来。」*
+*"We didn't lose those 22 minutes — they never happened. But the answer stayed."*
 
 </details>
 
 ---
 
-## 声明
+## Disclaimer
 
-非官方同人作品，与 Mobius Digital 及 Annapurna Interactive 无关。
-《Outer Wilds》及其中的名称、设定归其各自版权方所有。
-本仓库代码以 MIT 许可发布，见 [LICENSE](LICENSE)。
+Unofficial fan work. Not affiliated with Mobius Digital or Annapurna Interactive.
+*Outer Wilds*, and the names and lore within it, belong to their respective copyright holders.
+The code in this repository is released under the MIT License — see [LICENSE](LICENSE).
