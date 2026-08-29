@@ -26,6 +26,12 @@
 
 <br>
 
+<p align="center">
+  <img src="docs/demo.gif" alt="运行演示" width="900">
+</p>
+
+<p align="center"><sub>时间加速下的穷举过程 · 3 倍速录制</sub></p>
+
 > Orbital Probe Cannon · Ash Twin Project Simulator
 > 一个《星际拓荒》(Outer Wilds) 同人模拟器。
 
